@@ -73,12 +73,14 @@ class _OnlinePlay extends ConsumerStatefulWidget {
 }
 
 class _OnlinePlayState extends ConsumerState<_OnlinePlay> {
-  AutomatchSettings _settings = const AutomatchSettings();
-
   @override
   Widget build(BuildContext context) {
     final signedIn = ref.watch(authProvider).value?.isSignedIn ?? false;
     final automatch = ref.watch(automatchProvider);
+    final settings = ref.watch(automatchSettingsProvider);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    void update(AutomatchSettings s) => ref.read(automatchSettingsProvider.notifier).update(s);
 
     if (!signedIn) {
       return Center(
@@ -105,16 +107,16 @@ class _OnlinePlayState extends ConsumerState<_OnlinePlay> {
     }
 
     if (automatch is AutomatchSearching) {
+      final s = automatch.settings;
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
-            Text(
-              'Looking for an opponent: ${automatch.settings.size}×${automatch.settings.size}, '
-              '${automatch.settings.speed.label.toLowerCase()}',
-            ),
+            Text('Looking for an opponent', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text('${s.size}×${s.size} · ${s.speed.label} · ${s.timeLabel}'),
             const SizedBox(height: 12),
             OutlinedButton(
               onPressed: () => ref.read(automatchProvider.notifier).cancel(),
@@ -130,38 +132,113 @@ class _OnlinePlayState extends ConsumerState<_OnlinePlay> {
       children: [
         _Labeled(
           'Board size',
-          _sizeSelector(
-            _settings.size,
-            (v) => setState(() => _settings = _settings.copyWith(size: v)),
-          ),
+          _sizeSelector(settings.size, (v) => update(settings.copyWith(size: v))),
         ),
         _Labeled(
           'Speed',
-          Wrap(
-            spacing: 8,
+          Column(
             children: [
               for (final speed in GameSpeed.values)
-                ChoiceChip(
-                  label: Text(speed.label),
-                  tooltip: speed.description,
-                  selected: _settings.speed == speed,
-                  onSelected: (_) => setState(() => _settings = _settings.copyWith(speed: speed)),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Material(
+                    color: settings.speed == speed
+                        ? scheme.primaryContainer
+                        : scheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(12),
+                    child: ListTile(
+                      dense: true,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      title: Text(speed.label, style: theme.textTheme.titleSmall),
+                      subtitle: Text(speed.estimate(settings.size)),
+                      trailing: Text(
+                        quickMatchTime(
+                          settings.size,
+                          speed,
+                          speed == GameSpeed.correspondence ? ClockSystem.fischer : settings.system,
+                        ),
+                        style: theme.textTheme.titleSmall,
+                      ),
+                      onTap: () => update(settings.copyWith(speed: speed)),
+                    ),
+                  ),
                 ),
             ],
           ),
         ),
-        SwitchListTile(
-          title: const Text('Allow handicap'),
-          subtitle: const Text('Recommended when the ranks differ'),
-          value: _settings.handicap,
-          onChanged: (v) => setState(() => _settings = _settings.copyWith(handicap: v)),
+        if (settings.speed != GameSpeed.correspondence) ...[
+          _Labeled(
+            'Clock',
+            SegmentedButton<ClockSystem>(
+              segments: [
+                for (final c in ClockSystem.values) ButtonSegment(value: c, label: Text(c.label)),
+              ],
+              selected: {settings.system},
+              onSelectionChanged: (v) => update(settings.copyWith(system: v.first)),
+            ),
+          ),
+          SwitchListTile(
+            title: const Text('Flexible clock'),
+            subtitle: Text(
+              settings.flexibleClock
+                  ? 'Also accept ${settings.system == ClockSystem.fischer ? 'byo-yomi' : 'Fischer'} to find a game faster'
+                  : 'Only ${settings.system.label}',
+            ),
+            value: settings.flexibleClock,
+            onChanged: (v) => update(settings.copyWith(flexibleClock: v)),
+          ),
+        ],
+        _Labeled(
+          'Handicaps',
+          SegmentedButton<HandicapMode>(
+            segments: [
+              for (final h in HandicapMode.values) ButtonSegment(value: h, label: Text(h.label)),
+            ],
+            selected: {settings.handicap},
+            onSelectionChanged: (v) => update(settings.copyWith(handicap: v.first)),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            settings.handicap.description,
+            style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ),
+        _Labeled(
+          'Opponent rank: ${settings.lowerRankDiff} below to ${settings.upperRankDiff} above you',
+          RangeSlider(
+            min: -9,
+            max: 9,
+            divisions: 18,
+            values: RangeValues(
+              -settings.lowerRankDiff.toDouble(),
+              settings.upperRankDiff.toDouble(),
+            ),
+            labels: RangeLabels('−${settings.lowerRankDiff}', '+${settings.upperRankDiff}'),
+            onChanged: (v) => update(
+              settings.copyWith(
+                lowerRankDiff: (-v.start).round().clamp(0, 9),
+                upperRankDiff: v.end.round().clamp(0, 9),
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+          child: Text(
+            'OGS quick match games use Japanese rules.',
+            style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
         ),
         Padding(
           padding: const EdgeInsets.all(16),
           child: FilledButton.icon(
             icon: const Icon(Icons.search),
-            label: const Text('Find an opponent'),
-            onPressed: () => ref.read(automatchProvider.notifier).find(_settings),
+            label: Text(
+              'Play ${settings.size}×${settings.size} ${settings.speed.shortLabel.toLowerCase()} · ${settings.timeLabel}',
+            ),
+            onPressed: () => ref.read(automatchProvider.notifier).find(settings),
           ),
         ),
       ],

@@ -2,57 +2,201 @@ import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:meta/meta.dart';
-import 'package:tengen/src/model/go/rules.dart';
 import 'package:tengen/src/model/ogs/ogs_socket_provider.dart';
+import 'package:tengen/src/model/settings/preferences.dart';
 import 'package:tengen/src/utils/json.dart';
 
+/// The speeds of the OGS quick match.
 enum GameSpeed {
-  blitz('Blitz', '~5 minutes'),
-  rapid('Rapid', '~10 minutes'),
-  live('Live', '~20 minutes'),
-  correspondence('Correspondence', '~1 day per move');
+  blitz('Blitz'),
+  rapid('Rapid'),
+  live('Live'),
+  correspondence('Correspondence');
 
-  const GameSpeed(this.label, this.description);
+  const GameSpeed(this.label);
+
+  final String label;
+
+  /// Short label for the quick pairing grid.
+  String get shortLabel => this == correspondence ? 'Daily' : label;
+
+  /// Typical game length on OGS (`SPEED_OPTIONS` of the OGS website).
+  String estimate(int size) => switch (this) {
+    blitz =>
+      '~${switch (size) {
+        9 => 5,
+        13 => 10,
+        _ => 15,
+      }} min',
+    rapid =>
+      '~${switch (size) {
+        9 => 10,
+        13 => 20,
+        _ => 25,
+      }} min',
+    live =>
+      '~${switch (size) {
+        9 => 15,
+        13 => 30,
+        _ => 40,
+      }} min',
+    correspondence => '1 day per move',
+  };
+}
+
+/// The clock systems offered by the OGS quick match.
+enum ClockSystem {
+  fischer('Fischer'),
+  byoyomi('Byo-yomi');
+
+  const ClockSystem(this.label);
+
+  final String label;
+}
+
+/// The OGS quick match handicap options.
+enum HandicapMode {
+  /// Handicaps between players of different ranks.
+  required('Required', 'Handicaps between players with different ranks'),
+
+  /// Handicaps by default, but even games are accepted.
+  standard('Standard', 'Handicaps by default, even games accepted'),
+  disabled('Disabled', 'Even games only');
+
+  const HandicapMode(this.label, this.description);
 
   final String label;
   final String description;
 }
 
-/// What to look for when asking OGS to find an opponent.
+/// The time control of a quick match, exactly as on OGS (`SPEED_OPTIONS`).
+String quickMatchTime(int size, GameSpeed speed, ClockSystem system) {
+  if (speed == GameSpeed.correspondence) return '3d + 1d';
+  final fischer = system == ClockSystem.fischer;
+  return switch ((size, speed)) {
+    (_, GameSpeed.blitz) => fischer ? '30s + 5s' : '30s + 5×10s',
+    (9, GameSpeed.rapid) => fischer ? '2m + 7s' : '2m + 5×30s',
+    (13, GameSpeed.rapid) => fischer ? '3m + 7s' : '3m + 5×30s',
+    (_, GameSpeed.rapid) => fischer ? '5m + 7s' : '5m + 5×30s',
+    (9, GameSpeed.live) => fischer ? '3m + 10s' : '5m + 5×30s',
+    (13, GameSpeed.live) => fischer ? '5m + 10s' : '10m + 5×30s',
+    (_, _) => fischer ? '10m + 10s' : '20m + 5×30s',
+  };
+}
+
+/// What to look for when asking OGS to find an opponent: the options of the OGS quick match.
 @immutable
 class AutomatchSettings {
   const AutomatchSettings({
-    this.size = 19,
+    this.size = 9,
     this.speed = GameSpeed.rapid,
-    this.ruleset = Ruleset.japanese,
-    this.handicap = true,
+    this.system = ClockSystem.fischer,
+    this.flexibleClock = true,
+    this.handicap = HandicapMode.standard,
+    this.lowerRankDiff = 3,
+    this.upperRankDiff = 3,
   });
 
+  /// 9, 13 or 19.
   final int size;
   final GameSpeed speed;
-  final Ruleset ruleset;
-  final bool handicap;
+  final ClockSystem system;
 
-  /// The `automatch/find_match` preferences, as built by the OGS quick match page.
+  /// Also accept the other clock system ("Flexible" on OGS; "Exact" when false).
+  final bool flexibleClock;
+  final HandicapMode handicap;
+
+  /// How many ranks below and above the player the opponent may be.
+  final int lowerRankDiff;
+  final int upperRankDiff;
+
+  /// Correspondence games only use Fischer time on OGS.
+  ClockSystem get effectiveSystem =>
+      speed == GameSpeed.correspondence ? ClockSystem.fischer : system;
+
+  String get timeLabel => quickMatchTime(size, speed, effectiveSystem);
+
+  /// The `automatch/find_match` preferences, built like the OGS quick match page does. OGS
+  /// automatch games always use Japanese rules.
   Map<String, Object?> toPreferences(String uuid) => {
     'uuid': uuid,
     'size_speed_options': [
-      for (final system in ['byoyomi', 'fischer'])
-        {'size': '${size}x$size', 'speed': speed.name, 'system': system},
+      {'size': '${size}x$size', 'speed': speed.name, 'system': effectiveSystem.name},
+      if (flexibleClock && speed != GameSpeed.correspondence)
+        {
+          'size': '${size}x$size',
+          'speed': speed.name,
+          'system':
+              (effectiveSystem == ClockSystem.fischer ? ClockSystem.byoyomi : ClockSystem.fischer)
+                  .name,
+        },
     ],
-    'lower_rank_diff': 3,
-    'upper_rank_diff': 3,
-    'rules': {'condition': 'preferred', 'value': ruleset.name},
-    'handicap': {'condition': 'preferred', 'value': handicap ? 'enabled' : 'disabled'},
+    'lower_rank_diff': lowerRankDiff,
+    'upper_rank_diff': upperRankDiff,
+    'rules': {'condition': 'required', 'value': 'japanese'},
+    'handicap': {
+      'condition': handicap == HandicapMode.standard ? 'preferred' : 'required',
+      'value': handicap == HandicapMode.disabled ? 'disabled' : 'enabled',
+    },
   };
 
-  AutomatchSettings copyWith({int? size, GameSpeed? speed, Ruleset? ruleset, bool? handicap}) =>
-      AutomatchSettings(
-        size: size ?? this.size,
-        speed: speed ?? this.speed,
-        ruleset: ruleset ?? this.ruleset,
-        handicap: handicap ?? this.handicap,
-      );
+  AutomatchSettings copyWith({
+    int? size,
+    GameSpeed? speed,
+    ClockSystem? system,
+    bool? flexibleClock,
+    HandicapMode? handicap,
+    int? lowerRankDiff,
+    int? upperRankDiff,
+  }) => AutomatchSettings(
+    size: size ?? this.size,
+    speed: speed ?? this.speed,
+    system: system ?? this.system,
+    flexibleClock: flexibleClock ?? this.flexibleClock,
+    handicap: handicap ?? this.handicap,
+    lowerRankDiff: lowerRankDiff ?? this.lowerRankDiff,
+    upperRankDiff: upperRankDiff ?? this.upperRankDiff,
+  );
+}
+
+/// The quick match options last used, saved on the device (like the OGS website preferences).
+final automatchSettingsProvider = NotifierProvider<AutomatchSettingsController, AutomatchSettings>(
+  AutomatchSettingsController.new,
+);
+
+class AutomatchSettingsController extends Notifier<AutomatchSettings> {
+  static const _prefix = 'automatch.';
+
+  @override
+  AutomatchSettings build() {
+    final p = ref.watch(sharedPreferencesProvider);
+    T byName<T extends Enum>(List<T> values, String key, T fallback) =>
+        values.where((v) => v.name == p.getString('$_prefix$key')).firstOrNull ?? fallback;
+    const d = AutomatchSettings();
+    return AutomatchSettings(
+      size: p.getInt('${_prefix}size') ?? d.size,
+      speed: byName(GameSpeed.values, 'speed', d.speed),
+      system: byName(ClockSystem.values, 'system', d.system),
+      flexibleClock: p.getBool('${_prefix}flexible') ?? d.flexibleClock,
+      handicap: byName(HandicapMode.values, 'handicap', d.handicap),
+      lowerRankDiff: p.getInt('${_prefix}lower') ?? d.lowerRankDiff,
+      upperRankDiff: p.getInt('${_prefix}upper') ?? d.upperRankDiff,
+    );
+  }
+
+  Future<void> update(AutomatchSettings settings) async {
+    state = settings;
+    final p = ref.read(sharedPreferencesProvider);
+    await Future.wait([
+      p.setInt('${_prefix}size', settings.size),
+      p.setString('${_prefix}speed', settings.speed.name),
+      p.setString('${_prefix}system', settings.system.name),
+      p.setBool('${_prefix}flexible', settings.flexibleClock),
+      p.setString('${_prefix}handicap', settings.handicap.name),
+      p.setInt('${_prefix}lower', settings.lowerRankDiff),
+      p.setInt('${_prefix}upper', settings.upperRankDiff),
+    ]);
+  }
 }
 
 sealed class AutomatchState {

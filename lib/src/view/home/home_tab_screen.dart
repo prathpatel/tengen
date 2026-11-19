@@ -19,17 +19,8 @@ import 'package:tengen/src/widgets/board_thumbnail.dart';
 import 'package:tengen/src/widgets/list_section.dart';
 import 'package:tengen/src/widgets/player_bar.dart';
 
-/// The quick pairing presets, like the lichess home grid.
-const _quickPairings = [
-  AutomatchSettings(size: 9, speed: GameSpeed.blitz),
-  AutomatchSettings(size: 9, speed: GameSpeed.rapid),
-  AutomatchSettings(size: 13, speed: GameSpeed.rapid),
-  AutomatchSettings(size: 19, speed: GameSpeed.blitz),
-  AutomatchSettings(size: 19, speed: GameSpeed.rapid),
-  AutomatchSettings(size: 19, speed: GameSpeed.live),
-  AutomatchSettings(size: 9, speed: GameSpeed.correspondence),
-  AutomatchSettings(size: 19, speed: GameSpeed.correspondence),
-];
+/// The OGS quick match grid: speeds in rows, board sizes in columns.
+const _quickSizes = [9, 13, 19];
 
 String _greeting(DateTime now) => switch (now.hour) {
   < 5 => 'Good night',
@@ -366,6 +357,7 @@ class _QuickPairingGrid extends ConsumerWidget {
     final searching = ref.watch(automatchProvider);
     Widget tile({
       required String top,
+      required String middle,
       required String bottom,
       required VoidCallback onTap,
       bool selected = false,
@@ -384,7 +376,7 @@ class _QuickPairingGrid extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(top, style: theme.textTheme.titleLarge, maxLines: 1),
-                const SizedBox(height: 2),
+                Text(middle, style: theme.textTheme.titleSmall, maxLines: 1),
                 Text(
                   bottom,
                   maxLines: 1,
@@ -399,6 +391,7 @@ class _QuickPairingGrid extends ConsumerWidget {
       ),
     );
 
+    final saved = ref.watch(automatchSettingsProvider);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: GridView.count(
@@ -407,31 +400,34 @@ class _QuickPairingGrid extends ConsumerWidget {
         physics: const NeverScrollableScrollPhysics(),
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
-        childAspectRatio: 1.35,
+        childAspectRatio: 1.3,
         children: [
-          for (final preset in _quickPairings)
-            tile(
-              top: '${preset.size}×${preset.size}',
-              bottom: preset.speed == GameSpeed.correspondence ? 'Daily' : preset.speed.label,
-              selected:
-                  searching is AutomatchSearching &&
-                  searching.settings.size == preset.size &&
-                  searching.settings.speed == preset.speed,
-              onTap: () {
-                if (!signedIn) {
-                  pushFullScreen<void>(context, const SignInScreen());
-                } else if (searching is AutomatchSearching) {
-                  ref.read(automatchProvider.notifier).cancel();
-                } else {
-                  ref.read(automatchProvider.notifier).find(preset);
-                }
-              },
-            ),
-          tile(
-            top: 'Custom',
-            bottom: 'More options',
-            onTap: () => pushFullScreen<void>(context, const PlayScreen()),
-          ),
+          for (final speed in GameSpeed.values)
+            for (final size in _quickSizes)
+              Builder(
+                builder: (context) {
+                  final preset = saved.copyWith(size: size, speed: speed);
+                  return tile(
+                    top: '$size×$size',
+                    middle: speed.shortLabel,
+                    bottom: preset.timeLabel,
+                    selected:
+                        searching is AutomatchSearching &&
+                        searching.settings.size == size &&
+                        searching.settings.speed == speed,
+                    onTap: () {
+                      if (!signedIn) {
+                        pushFullScreen<void>(context, const SignInScreen());
+                      } else if (searching is AutomatchSearching) {
+                        ref.read(automatchProvider.notifier).cancel();
+                      } else {
+                        ref.read(automatchSettingsProvider.notifier).update(preset);
+                        ref.read(automatchProvider.notifier).find(preset);
+                      }
+                    },
+                  );
+                },
+              ),
         ],
       ),
     );
