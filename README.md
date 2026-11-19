@@ -28,6 +28,8 @@ This is an unofficial client, not affiliated with OGS or Lichess.
   resigning, undo requests, stone removal and result, live clocks (Fischer, byo-yomi, Canadian,
   simple, absolute) corrected for clock drift.
 - **Watch**: top live and correspondence games on OGS, updated in real time.
+- **Chat**: the public OGS chat rooms (English, Help, language rooms…) and the chat of each game,
+  for players and spectators.
 - **Player profiles** with recent games.
 - Board themes, coordinates, tap-twice move confirmation, light and dark themes.
 

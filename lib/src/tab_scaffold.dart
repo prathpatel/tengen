@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:tengen/src/view/chat/chat_tab_screen.dart';
 import 'package:tengen/src/view/home/home_tab_screen.dart';
 import 'package:tengen/src/view/more/more_tab_screen.dart';
 import 'package:tengen/src/view/play/play_tab_screen.dart';
@@ -9,6 +10,7 @@ enum BottomTab {
   home('Home', Icons.home_outlined, Icons.home),
   play('Play', Icons.sports_esports_outlined, Icons.sports_esports),
   watch('Watch', Icons.live_tv_outlined, Icons.live_tv),
+  chat('Chat', Icons.forum_outlined, Icons.forum),
   more('More', Icons.menu, Icons.menu);
 
   const BottomTab(this.label, this.icon, this.selectedIcon);
@@ -21,6 +23,7 @@ enum BottomTab {
     home => const HomeTabScreen(),
     play => const PlayTabScreen(),
     watch => const WatchTabScreen(),
+    chat => const ChatTabScreen(),
     more => const MoreTabScreen(),
   };
 }
