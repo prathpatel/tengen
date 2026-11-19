@@ -4,8 +4,8 @@ import 'package:tengen/src/utils/navigation.dart';
 import 'package:tengen/src/view/chat/chat_room_screen.dart';
 
 /// The public chat rooms of online-go.com.
-class ChatTabScreen extends StatelessWidget {
-  const ChatTabScreen({super.key});
+class ChatRoomsScreen extends StatelessWidget {
+  const ChatRoomsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

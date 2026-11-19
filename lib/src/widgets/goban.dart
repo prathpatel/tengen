@@ -15,6 +15,63 @@ class GobanTerritory {
   final Set<Point> white;
 }
 
+/// The part of the board to show, inclusive bounds in board coordinates.
+@immutable
+class GobanViewport {
+  const GobanViewport(this.left, this.top, this.right, this.bottom);
+
+  /// The whole board.
+  GobanViewport.full(Board board) : this(0, 0, board.width - 1, board.height - 1);
+
+  /// The smallest area showing [points] with [margin] free lines around them, or the whole board
+  /// when that area is most of it anyway (puzzles are usually in one corner).
+  factory GobanViewport.around(Board board, Iterable<Point> points, {int margin = 2}) {
+    if (points.isEmpty) return GobanViewport.full(board);
+    var left = board.width;
+    var top = board.height;
+    var right = 0;
+    var bottom = 0;
+    for (final p in points) {
+      if (p.x < left) left = p.x;
+      if (p.y < top) top = p.y;
+      if (p.x > right) right = p.x;
+      if (p.y > bottom) bottom = p.y;
+    }
+    // Snap to an edge when close to it: the edge matters in life and death problems.
+    int low(int v) => v - margin <= 2 ? 0 : v - margin;
+    int high(int v, int max) => v + margin >= max - 2 ? max : v + margin;
+    final vp = GobanViewport(
+      low(left),
+      low(top),
+      high(right, board.width - 1),
+      high(bottom, board.height - 1),
+    );
+    final area = vp.columns * vp.rows;
+    return area > board.width * board.height * 0.7 ? GobanViewport.full(board) : vp;
+  }
+
+  final int left;
+  final int top;
+  final int right;
+  final int bottom;
+
+  int get columns => right - left + 1;
+  int get rows => bottom - top + 1;
+
+  bool contains(Point p) => p.x >= left && p.x <= right && p.y >= top && p.y <= bottom;
+
+  @override
+  bool operator ==(Object other) =>
+      other is GobanViewport &&
+      other.left == left &&
+      other.top == top &&
+      other.right == right &&
+      other.bottom == bottom;
+
+  @override
+  int get hashCode => Object.hash(left, top, right, bottom);
+}
+
 /// An interactive Go board.
 ///
 /// When [onPlay] is set and [toPlay] is not null the board accepts moves: with [confirmMoves] the
@@ -33,10 +90,14 @@ class Goban extends StatefulWidget {
     this.pendingMove,
     this.deadStones = const {},
     this.territory,
+    this.viewport,
     super.key,
   });
 
   final Board board;
+
+  /// The part of the board shown; the whole board when null.
+  final GobanViewport? viewport;
   final BoardTheme theme;
   final bool showCoordinates;
   final Point? lastMove;
@@ -59,12 +120,18 @@ class Goban extends StatefulWidget {
 /// Geometry shared by the painter and the hit testing.
 @immutable
 class GobanGeometry {
-  GobanGeometry(Size size, this.columns, this.rows, {required bool coordinates})
-    : margin = coordinates ? coordinatesMargin : plainMargin,
-      cell = math.min(
-        size.width / (columns - 1 + 2 * (coordinates ? coordinatesMargin : plainMargin)),
-        size.height / (rows - 1 + 2 * (coordinates ? coordinatesMargin : plainMargin)),
-      );
+  GobanGeometry(
+    Size size,
+    this.columns,
+    this.rows, {
+    required bool coordinates,
+    this.originX = 0,
+    this.originY = 0,
+  }) : margin = coordinates ? coordinatesMargin : plainMargin,
+       cell = math.min(
+         size.width / (columns - 1 + 2 * (coordinates ? coordinatesMargin : plainMargin)),
+         size.height / (rows - 1 + 2 * (coordinates ? coordinatesMargin : plainMargin)),
+       );
 
   /// Distance from the board edge to the first line, in cells. With coordinates, the labels get
   /// their own band ([labelCenter]) outside the stones, which reach 0.5 cell beyond the lines.
@@ -74,19 +141,23 @@ class GobanGeometry {
   /// Distance from the board edge to the center of the coordinate labels, in cells.
   static const labelCenter = 0.42;
 
+  /// The number of lines shown, and the board coordinates of the first ones.
   final int columns;
   final int rows;
+  final int originX;
+  final int originY;
   final double margin;
   final double cell;
 
-  Offset offsetOf(Point p) => Offset((margin + p.x) * cell, (margin + p.y) * cell);
+  Offset offsetOf(Point p) =>
+      Offset((margin + p.x - originX) * cell, (margin + p.y - originY) * cell);
 
   /// The intersection closest to [offset], or null when outside the grid.
   Point? pointAt(Offset offset) {
     final x = (offset.dx / cell - margin).round();
     final y = (offset.dy / cell - margin).round();
     if (x < 0 || y < 0 || x >= columns || y >= rows) return null;
-    return Point(x, y);
+    return Point(x + originX, y + originY);
   }
 }
 
@@ -122,16 +193,19 @@ class _GobanState extends State<Goban> {
   @override
   Widget build(BuildContext context) {
     final board = widget.board;
+    final viewport = widget.viewport ?? GobanViewport.full(board);
     return AspectRatio(
-      aspectRatio: board.width / board.height,
+      aspectRatio: viewport.columns / viewport.rows,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final size = constraints.biggest;
           final geometry = GobanGeometry(
             size,
-            board.width,
-            board.height,
+            viewport.columns,
+            viewport.rows,
             coordinates: widget.showCoordinates,
+            originX: viewport.left,
+            originY: viewport.top,
           );
           return Semantics(
             label: 'Go board, ${board.width} by ${board.height}',
@@ -144,6 +218,7 @@ class _GobanState extends State<Goban> {
                 size: size,
                 painter: _GobanPainter(
                   board: board,
+                  viewport: viewport,
                   geometry: geometry,
                   theme: widget.theme,
                   showCoordinates: widget.showCoordinates,
@@ -166,6 +241,7 @@ class _GobanState extends State<Goban> {
 class _GobanPainter extends CustomPainter {
   _GobanPainter({
     required this.board,
+    required this.viewport,
     required this.geometry,
     required this.theme,
     required this.showCoordinates,
@@ -178,6 +254,7 @@ class _GobanPainter extends CustomPainter {
   });
 
   final Board board;
+  final GobanViewport viewport;
   final GobanGeometry geometry;
   final BoardTheme theme;
   final bool showCoordinates;
@@ -191,12 +268,14 @@ class _GobanPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final cell = geometry.cell;
+    final vp = viewport;
     final boardRect = Rect.fromLTWH(
       0,
       0,
-      (board.width - 1 + 2 * geometry.margin) * cell,
-      (board.height - 1 + 2 * geometry.margin) * cell,
+      (vp.columns - 1 + 2 * geometry.margin) * cell,
+      (vp.rows - 1 + 2 * geometry.margin) * cell,
     );
+    canvas.clipRect(boardRect);
 
     // Wood, edge to edge as in the lichess app.
     canvas.drawRect(
@@ -217,22 +296,27 @@ class _GobanPainter extends CustomPainter {
     final linePaint = Paint()
       ..color = theme.lines
       ..strokeWidth = math.max(1, cell * 0.035);
-    for (var x = 0; x < board.width; x++) {
+    // Where the view cuts the board, the lines run to the border to show that it continues.
+    final cutTop = vp.top > 0 ? geometry.margin * cell : 0.0;
+    final cutBottom = vp.bottom < board.height - 1 ? geometry.margin * cell : 0.0;
+    final cutLeft = vp.left > 0 ? geometry.margin * cell : 0.0;
+    final cutRight = vp.right < board.width - 1 ? geometry.margin * cell : 0.0;
+    for (var x = vp.left; x <= vp.right; x++) {
       canvas.drawLine(
-        geometry.offsetOf(Point(x, 0)),
-        geometry.offsetOf(Point(x, board.height - 1)),
+        geometry.offsetOf(Point(x, vp.top)) - Offset(0, cutTop),
+        geometry.offsetOf(Point(x, vp.bottom)) + Offset(0, cutBottom),
         linePaint,
       );
     }
-    for (var y = 0; y < board.height; y++) {
+    for (var y = vp.top; y <= vp.bottom; y++) {
       canvas.drawLine(
-        geometry.offsetOf(Point(0, y)),
-        geometry.offsetOf(Point(board.width - 1, y)),
+        geometry.offsetOf(Point(vp.left, y)) - Offset(cutLeft, 0),
+        geometry.offsetOf(Point(vp.right, y)) + Offset(cutRight, 0),
         linePaint,
       );
     }
     final starPaint = Paint()..color = theme.lines;
-    for (final p in starPoints(board.width, board.height)) {
+    for (final p in starPoints(board.width, board.height).where(vp.contains)) {
       canvas.drawCircle(geometry.offsetOf(p), cell * 0.1, starPaint);
     }
 
@@ -253,7 +337,7 @@ class _GobanPainter extends CustomPainter {
     }
 
     // Stones.
-    for (final p in board.points) {
+    for (final p in board.points.where(vp.contains)) {
       final color = board[p];
       if (color == null) continue;
       _paintStone(canvas, p, color, opacity: deadStones.contains(p) ? 0.45 : 1);
@@ -337,15 +421,16 @@ class _GobanPainter extends CustomPainter {
 
     const band = GobanGeometry.labelCenter;
     final offset = band * cell;
-    final far = (2 * geometry.margin - band + board.height - 1) * cell;
-    final right = (2 * geometry.margin - band + board.width - 1) * cell;
-    for (var x = 0; x < board.width; x++) {
-      final cx = geometry.offsetOf(Point(x, 0)).dx;
+    final vp = viewport;
+    final far = (2 * geometry.margin - band + vp.rows - 1) * cell;
+    final right = (2 * geometry.margin - band + vp.columns - 1) * cell;
+    for (var x = vp.left; x <= vp.right; x++) {
+      final cx = geometry.offsetOf(Point(x, vp.top)).dx;
       label(prettyColumns[x], Offset(cx, offset));
       label(prettyColumns[x], Offset(cx, far));
     }
-    for (var y = 0; y < board.height; y++) {
-      final cy = geometry.offsetOf(Point(0, y)).dy;
+    for (var y = vp.top; y <= vp.bottom; y++) {
+      final cy = geometry.offsetOf(Point(vp.left, y)).dy;
       label('${board.height - y}', Offset(offset, cy));
       label('${board.height - y}', Offset(right, cy));
     }
@@ -354,6 +439,7 @@ class _GobanPainter extends CustomPainter {
   @override
   bool shouldRepaint(_GobanPainter old) =>
       old.board != board ||
+      old.viewport != viewport ||
       old.theme != theme ||
       old.showCoordinates != showCoordinates ||
       old.lastMove != lastMove ||

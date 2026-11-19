@@ -8,17 +8,21 @@ import 'package:tengen/src/model/online_game/automatch_controller.dart';
 import 'package:tengen/src/utils/navigation.dart';
 import 'package:tengen/src/view/auth/sign_in_screen.dart';
 import 'package:tengen/src/view/offline_game/offline_game_screen.dart';
-import 'package:tengen/src/view/online_game/online_game_screen.dart';
 
-class PlayTabScreen extends StatelessWidget {
-  const PlayTabScreen({super.key});
+/// Starts a game: online with the OGS automatch, or offline on the device.
+class PlayScreen extends StatelessWidget {
+  const PlayScreen({this.offline = false, super.key});
+
+  /// Opens on the offline tab.
+  final bool offline;
 
   @override
   Widget build(BuildContext context) => DefaultTabController(
     length: 2,
+    initialIndex: offline ? 1 : 0,
     child: Scaffold(
       appBar: AppBar(
-        title: const Text('Play'),
+        title: const Text('New game'),
         bottom: const TabBar(
           tabs: [
             Tab(text: 'Online'),
@@ -75,13 +79,6 @@ class _OnlinePlayState extends ConsumerState<_OnlinePlay> {
   Widget build(BuildContext context) {
     final signedIn = ref.watch(authProvider).value?.isSignedIn ?? false;
     final automatch = ref.watch(automatchProvider);
-
-    ref.listen(automatchProvider, (_, next) {
-      if (next is AutomatchFound) {
-        ref.read(automatchProvider.notifier).reset();
-        pushFullScreen<void>(context, OnlineGameScreen(gameId: next.gameId));
-      }
-    });
 
     if (!signedIn) {
       return Center(

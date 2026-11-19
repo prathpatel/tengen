@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:tengen/src/constants.dart';
 import 'package:tengen/src/model/go/game.dart';
 import 'package:tengen/src/model/ogs/game_data.dart';
+import 'package:tengen/src/model/puzzle/puzzle.dart';
 import 'package:tengen/src/network/http.dart';
 import 'package:tengen/src/network/socket.dart';
 import 'package:tengen/src/utils/json.dart';
@@ -146,5 +147,25 @@ void main() {
     }
     // ignore: avoid_print
     print('compared $compared finished games');
+  });
+
+  test('reads the featured OGS puzzle collections and their first puzzles', () async {
+    final repo = PuzzleRepository(api);
+    for (final id in featuredCollectionIds) {
+      final collection = await repo.collection(id);
+      expect(collection.puzzleCount, greaterThan(0), reason: 'collection $id');
+      expect(collection.preview, isNotNull, reason: 'collection $id');
+      final puzzle = await repo.puzzle(collection.startingPuzzleId);
+      expect(puzzle.root.branches, isNotEmpty, reason: 'puzzle ${puzzle.id}');
+      final summary = await repo.collectionSummary(puzzle.id);
+      expect(summary.map((e) => e.id), contains(puzzle.id));
+      // ignore: avoid_print
+      print(
+        '${collection.name}: ${collection.puzzleCount} puzzles, first "${puzzle.name}" '
+        '${puzzle.board.width}x${puzzle.board.height} solution=${puzzle.hasSolution}',
+      );
+    }
+    final search = await repo.collections(search: 'tesuji', pageSize: 5);
+    expect(search, isNotEmpty);
   });
 }

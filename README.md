@@ -12,9 +12,10 @@ and its [goban](https://github.com/online-go/goban) library.
 This is an unofficial client, not affiliated with OGS or Lichess.
 
 <p>
-  <img src="docs/screenshots/home.png" width="240" alt="Home tab">
-  <img src="docs/screenshots/play.png" width="240" alt="Offline game setup">
-  <img src="docs/screenshots/offline-game.png" width="240" alt="A 9×9 game against the computer">
+  <img src="docs/screenshots/home.png" width="200" alt="Home">
+  <img src="docs/screenshots/puzzles.png" width="200" alt="Puzzles">
+  <img src="docs/screenshots/learn.png" width="200" alt="Learn">
+  <img src="docs/screenshots/offline-game.png" width="200" alt="A game against the computer">
 </p>
 
 ## Features
@@ -27,6 +28,8 @@ This is an unofficial client, not affiliated with OGS or Lichess.
 - **Online play**: automatch (quick match by board size and speed), playing moves, passing,
   resigning, undo requests, stone removal and result, live clocks (Fischer, byo-yomi, Canadian,
   simple, absolute) corrected for clock drift.
+- **Puzzles**: the OGS puzzle collections (life and death, tesuji…) with an in-app solver.
+- **Learn**: interactive lessons on the rules, coordinate training, practice against the computer.
 - **Watch**: top live and correspondence games on OGS, updated in real time.
 - **Chat**: the public OGS chat rooms (English, Help, language rooms…) and the chat of each game,
   for players and spectators.

@@ -2,125 +2,140 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/constants.dart';
 import 'package:tengen/src/model/auth/auth_controller.dart';
-import 'package:tengen/src/model/settings/preferences.dart';
+import 'package:tengen/src/model/offline_game/offline_game_controller.dart';
 import 'package:tengen/src/utils/navigation.dart';
 import 'package:tengen/src/view/auth/sign_in_screen.dart';
+import 'package:tengen/src/view/chat/chat_rooms_screen.dart';
+import 'package:tengen/src/view/offline_game/offline_game_screen.dart';
+import 'package:tengen/src/view/play/play_screen.dart';
+import 'package:tengen/src/view/settings/settings_screen.dart';
 import 'package:tengen/src/view/user/player_screen.dart';
+import 'package:tengen/src/widgets/list_section.dart';
 
+/// Grouped links, as in the More tab of the lichess app.
 class MoreTabScreen extends ConsumerWidget {
   const MoreTabScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider).value;
-    final prefs = ref.watch(preferencesProvider);
-    final controller = ref.read(preferencesProvider.notifier);
+    final signedIn = auth?.isSignedIn ?? false;
     final theme = Theme.of(context);
 
-    Widget section(String title) => Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+    Widget label(String text) => Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
       child: Text(
-        title,
-        style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary),
+        text,
+        style: theme.textTheme.titleMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('More')),
+      appBar: AppBar(title: const Text(kAppName)),
       body: ListView(
+        padding: const EdgeInsets.only(bottom: 24),
         children: [
-          section('Account'),
-          if (auth != null && auth.isSignedIn) ...[
-            ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: Text(auth.user.displayName),
-              subtitle: const Text('Profile and recent games'),
-              onTap: () => pushInTab<void>(context, PlayerScreen(playerId: auth.user.id)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Sign out'),
-              onTap: () async {
-                if (await confirm(context, title: 'Sign out?', confirmLabel: 'Sign out')) {
-                  await ref.read(authProvider.notifier).signOut();
-                }
-              },
-            ),
-          ] else
-            ListTile(
-              leading: const Icon(Icons.login),
-              title: const Text('Sign in to online-go.com'),
-              onTap: () => pushFullScreen<void>(context, const SignInScreen()),
-            ),
-          section('Board'),
-          ListTile(
-            leading: const Icon(Icons.grid_on),
-            title: const Text('Board theme'),
-            trailing: DropdownButton<BoardTheme>(
-              value: prefs.boardTheme,
-              items: [
-                for (final t in BoardTheme.values)
-                  DropdownMenuItem(
-                    value: t,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 16,
-                          height: 16,
-                          decoration: BoxDecoration(
-                            color: t.wood,
-                            borderRadius: BorderRadius.circular(3),
-                            border: Border.all(color: t.lines, width: 0.5),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(t.label),
-                      ],
-                    ),
+          label('Play'),
+          CardSection(
+            children: [
+              CardRow(
+                icon: Icons.public,
+                title: 'Play online',
+                onTap: () => pushFullScreen<void>(context, const PlayScreen()),
+              ),
+              CardRow(
+                icon: Icons.smart_toy_outlined,
+                title: 'Play the computer',
+                onTap: () => pushFullScreen<void>(context, const PlayScreen(offline: true)),
+              ),
+              CardRow(
+                icon: Icons.people_outline,
+                title: 'Pass and play',
+                onTap: () => pushFullScreen<void>(
+                  context,
+                  const OfflineGameScreen(
+                    setup: OfflineGameSetup(opponent: OfflineOpponent.human, size: 13),
                   ),
+                ),
+              ),
+            ],
+          ),
+          label('Community'),
+          CardSection(
+            children: [
+              CardRow(
+                icon: Icons.forum_outlined,
+                title: 'Chat rooms',
+                onTap: () => pushInTab<void>(context, const ChatRoomsScreen()),
+              ),
+            ],
+          ),
+          label(signedIn ? auth!.user.username : 'Account'),
+          CardSection(
+            children: [
+              if (signedIn) ...[
+                CardRow(
+                  icon: Icons.person_outline,
+                  title: 'Profile',
+                  onTap: () => pushInTab<void>(context, PlayerScreen(playerId: auth!.user.id)),
+                ),
+                CardRow(
+                  icon: Icons.settings_outlined,
+                  title: 'Settings',
+                  onTap: () => pushInTab<void>(context, const SettingsScreen()),
+                ),
+                CardRow(
+                  icon: Icons.logout,
+                  title: 'Sign out',
+                  onTap: () async {
+                    if (await confirm(context, title: 'Sign out?', confirmLabel: 'Sign out')) {
+                      await ref.read(authProvider.notifier).signOut();
+                    }
+                  },
+                ),
+              ] else ...[
+                CardRow(
+                  icon: Icons.login,
+                  title: 'Sign in to online-go.com',
+                  onTap: () => pushFullScreen<void>(context, const SignInScreen()),
+                ),
+                CardRow(
+                  icon: Icons.settings_outlined,
+                  title: 'Settings',
+                  onTap: () => pushInTab<void>(context, const SettingsScreen()),
+                ),
               ],
-              onChanged: (t) => t == null ? null : controller.setBoardTheme(t),
-            ),
+            ],
           ),
-          SwitchListTile(
-            secondary: const Icon(Icons.abc),
-            title: const Text('Show coordinates'),
-            value: prefs.showCoordinates,
-            onChanged: controller.setShowCoordinates,
+          const SizedBox(height: 16),
+          CardSection(
+            children: [
+              CardRow(
+                icon: Icons.info_outline,
+                title: 'About',
+                onTap: () => showAboutDialog(
+                  context: context,
+                  applicationName: kAppName,
+                  applicationVersion: kAppVersion,
+                  applicationLegalese:
+                      'Free software under the GNU GPL v3 or later.\n\n'
+                      'Based on the Lichess mobile app (github.com/lichess-org/mobile). Online '
+                      'play uses the online-go.com APIs; this app is not affiliated with OGS.',
+                ),
+              ),
+            ],
           ),
-          SwitchListTile(
-            secondary: const Icon(Icons.touch_app_outlined),
-            title: const Text('Confirm moves'),
-            subtitle: const Text('Tap twice to place a stone'),
-            value: prefs.confirmMoves,
-            onChanged: controller.setConfirmMoves,
-          ),
-          section('App'),
-          ListTile(
-            leading: const Icon(Icons.brightness_6_outlined),
-            title: const Text('Theme'),
-            trailing: DropdownButton<AppThemeMode>(
-              value: prefs.themeMode,
-              items: const [
-                DropdownMenuItem(value: AppThemeMode.system, child: Text('System')),
-                DropdownMenuItem(value: AppThemeMode.light, child: Text('Light')),
-                DropdownMenuItem(value: AppThemeMode.dark, child: Text('Dark')),
-              ],
-              onChanged: (m) => m == null ? null : controller.setThemeMode(m),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text('About'),
-            onTap: () => showAboutDialog(
-              context: context,
-              applicationName: kAppName,
-              applicationVersion: kAppVersion,
-              applicationLegalese:
-                  'Free software under the GNU GPL v3 or later.\n\n'
-                  'Based on the Lichess mobile app (github.com/lichess-org/mobile). Online play '
-                  'uses the online-go.com APIs; this app is not affiliated with OGS.',
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+            child: Text(
+              '$kAppName is a free, open source app to play Go, on online-go.com or on your '
+              'device.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         ],
