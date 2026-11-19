@@ -1,38 +1,28 @@
-Copying Lichess Mobile
-======================
+Copying Tengen
+==============
 
-Any file in this project that does not state otherwise and is not listed as an
-exception below is part of *Lichess Mobile*, the mobile app for
-[lichess.org](https://lichess.org/mobile), and copyright (c) 2022-2023 Lichess Mobile
-contributors.
+Tengen is free software: you can redistribute it and/or modify it under the terms of the GNU
+General Public License as published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
 
-For a list of the authors see the commit log or
-https://github.com/lichess-org/mobile/graphs/contributors.
-
-Lichess Mobile is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU General Public License for more details.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+General Public License for more details.
 
 See the LICENSE file for a copy of the *GNU General Public License*.
 
-Exceptions (free)
------------------
+Origin
+------
 
-Files | Author(s) | License
---- | --- | ---
-Fontawesome in assets/fonts | [davegandy](https://fontawesome.com) | [SIL OFL 1.1](https://opensource.org/licenses/OFL-1.1)
-assets/images/learn/pieces | Thibault Duplessis and [Colin M.L. Burnett](https://en.wikipedia.org/wiki/User:Cburnett) | [GPLv2+](https://www.gnu.org/licenses/gpl-2.0.txt)
-assets/images/learn/*.webp | [game-icons.net](https://game-icons.net/about.html) | [CC BY 3.0](http://creativecommons.org/licenses/by/3.0/) (Rasterized from the lila SVGs)
+Tengen is derived from [Lichess Mobile](https://github.com/lichess-org/mobile), copyright (c)
+Lichess Mobile contributors, licensed under the GNU GPL v3 or later. The first commit of this
+repository is a snapshot of that project; see the commit log for what was changed since.
 
-External services
------------------
+The OGS client follows the protocol and conventions of the
+[online-go.com web client](https://github.com/online-go/online-go.com) and the
+[goban](https://github.com/online-go/goban) library (AGPL-3.0 and Apache-2.0). No code from those
+projects is included: the Dart implementation here is original, written against their documented
+behavior.
 
-Lichess Mobile relies on these external services:
-
-* [lichess.org](https://lichess.org)
+"Lichess" and "OGS"/"online-go.com" are the names of their respective projects; Tengen is not
+affiliated with or endorsed by either.

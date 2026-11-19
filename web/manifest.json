@@ -1,11 +1,11 @@
 {
-    "name": "tengen",
-    "short_name": "tengen",
+    "name": "Tengen",
+    "short_name": "Tengen",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Play Go on online-go.com and offline.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

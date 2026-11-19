@@ -1,71 +1,92 @@
-# Lichess Mobile
+# Tengen
 
-Second iteration of the [Lichess mobile app](https://lichess.org/mobile).
+An open source Flutter app to play Go (baduk, weiqi) on [online-go.com](https://online-go.com)
+and offline.
 
-## How to contribute
+Tengen started as a fork of the [Lichess mobile app](https://github.com/lichess-org/mobile): it
+keeps its architecture (Riverpod state, model/view/widgets layering, one navigator per tab,
+full-screen game routes, strict analysis rules) and replaces chess with Go. Online play is built
+on the APIs used by the [online-go.com web client](https://github.com/online-go/online-go.com)
+and its [goban](https://github.com/online-go/goban) library.
 
-Contributions to this project are welcome!
+This is an unofficial client, not affiliated with OGS or Lichess.
 
-If you want to contribute, please read the [contributing guide](./CONTRIBUTING.md).
+<p>
+  <img src="docs/screenshots/home.png" width="240" alt="Home tab">
+  <img src="docs/screenshots/play.png" width="240" alt="Offline game setup">
+  <img src="docs/screenshots/offline-game.png" width="240" alt="A 9×9 game against the computer">
+</p>
 
-If you are new to this project, you can [read the documentation](./docs) to get
-started. The [AGENTS.md](./AGENTS.md) is also a good resource to understand the
-codebase.
+## Features
 
-## Setup
+- **Offline games** against a small built-in bot, or pass and play, on 9×9, 13×13 and 19×19, with
+  Japanese, Chinese, AGA, Korean, New Zealand and Ing rules, handicap, undo, counting with dead
+  stone marking, and SGF export.
+- **OGS account**: sign in with your online-go.com username and password, see your ongoing games
+  with the ones waiting for your move first.
+- **Online play**: automatch (quick match by board size and speed), playing moves, passing,
+  resigning, undo requests, stone removal and result, live clocks (Fischer, byo-yomi, Canadian,
+  simple, absolute) corrected for clock drift.
+- **Watch**: top live and correspondence games on OGS, updated in real time.
+- **Player profiles** with recent games.
+- Board themes, coordinates, tap-twice move confirmation, light and dark themes.
 
-tl;dr: Install Flutter, clone the repo, run in order:
-- `flutter pub get`
-- `dart run build_runner watch`
-- `flutter analyze --watch`
+## Development
 
-and you're ready to code!
-
-See [the dev environment docs](./docs/setting_dev_env.md) for detailed instructions.
-
-## Running the app
-
-To run the app, you can use the following command:
-
-```bash
-# if not already done, run the code generation
-dart run build_runner build
-
-# run the app on all available devices
-flutter run -d all
-```
-
-### Previewing the platform designs
-
-To check the iOS and Android designs on any device, run the app in device preview:
+Requires Flutter 3.50 (Dart 3.14).
 
 ```bash
-flutter run -t lib/device_preview_main.dart
+flutter pub get
+flutter run                       # Android, iOS, Linux or web
+flutter test                      # unit and widget tests
+flutter analyze && dart format lib test
 ```
 
-See [Device preview](./docs/setting_dev_env.md#device-preview) for how to use it and its
-limitations.
-
-## Running tests
-
-To run the tests, you can use the following command:
+Use another OGS server (e.g. the beta site):
 
 ```bash
-# if not already done, run the code generation
-dart run build_runner build
-
-flutter test
+flutter run --dart-define=OGS_HOST=beta.online-go.com
 ```
 
-## Internationalisation
+`test/live/` holds a test that replays real games from online-go.com through the rules engine
+and compares capture counts with the server's scores. It is skipped by default:
 
-Do not edit the files in `translation/` folder (except `translation/source/mobile.xml`), nor the `app_en.arb` file: these files are generated.
-For more information, see [Internationalisation](./docs/internationalisation.md).
+```bash
+flutter test -t live --run-skipped
+```
 
-## Releasing
+## Architecture
 
-Only for members of lichess team.
+```
+lib/src/
+├── model/
+│   ├── go/            # Rules engine: board, game, rule sets, scoring, coordinates, SGF, bot
+│   ├── ogs/           # OGS data (game data, clocks, users), repository, socket provider
+│   ├── online_game/   # Online game and automatch controllers
+│   ├── offline_game/  # Offline game controller
+│   ├── auth/          # OGS session
+│   └── settings/      # Preferences
+├── network/           # REST client (session cookies + CSRF) and realtime socket
+├── view/              # Screens, by feature (home, play, watch, more, games, profile)
+├── widgets/           # Board, player bars and clocks, game layout
+└── tab_scaffold.dart  # Bottom tabs, one navigator per tab
+```
 
-1. Bump the pubspec.yaml version number. This can be in a PR making a change or a separate PR. Use semantic versioning to determine which part to increment. The version number after the + should also be incremented. For example 0.3.3+000303 with a patch should become 0.3.4+000304.
-2. Run workflow [Deploy to Play Store](https://github.com/lichess-org/mobile/actions/workflows/deploy_play_store.yml)
-3. [Publish on F-Droid](./docs/publish_fdroid.md)
+How the OGS integration works:
+
+- **Authentication** mirrors the website: `GET /api/v1/ui/config` for a CSRF cookie, then
+  `POST /api/v0/login`. The Django `sessionid` and `csrftoken` cookies are kept in secure
+  storage. `ui/config` returns the `user_jwt` used to authenticate the realtime socket (guests
+  get one too, so watching works without an account). Accounts that only use a social login need
+  to set a password on OGS first.
+- **Realtime** (`network/socket.dart`) is a port of goban's `GobanSocket`: JSON arrays
+  `[command, data, id?]`, replies matched by id, `net/ping` every 10 s to measure latency and
+  clock drift, automatic reconnection with backoff, authentication replayed on every connection.
+- **Games** (`model/online_game/`) send `game/connect`, build the board from `gamedata` and apply
+  `move`, `clock`, `phase`, `removed_stones` and `undo_*` events. A missed move triggers a
+  resynchronisation. Moves from the server are applied without validation (the server is
+  authoritative); local validation only guards the user's own taps.
+
+## License
+
+GPL-3.0-or-later, see [COPYING.md](COPYING.md) and [LICENSE](LICENSE).

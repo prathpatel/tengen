@@ -66,7 +66,7 @@ packages:
     source: hosted
     version: "3.0.8"
   cupertino_ui:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: cupertino_ui
       sha256: c3eaf7f5bdfee36deb0b14a4cbf7602f1b6b8d8b8576b81f38fc08c25881c94c
@@ -74,7 +74,7 @@ packages:
     source: hosted
     version: "1.1.7"
   fake_async:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: fake_async
       sha256: "5368f224a74523e8d2e7399ea1638b37aecfca824a3cc4dfdf77bf1fa905ac44"
@@ -523,7 +523,7 @@ packages:
     source: hosted
     version: "1.0.0"
   stream_channel:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: stream_channel
       sha256: "969e04c80b8bcdf826f8f16579c7b14d780458bd97f56d107d3950fdbeef059d"

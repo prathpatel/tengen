@@ -4,24 +4,20 @@ on:
   push:
     paths:
       - 'lib/**'
-      - '!lib/l10n/**'
       - 'test/**'
       - 'pubspec.yaml'
       - 'pubspec.lock'
       - 'analysis_options.yaml'
-      - 'build.yaml'
       - '.github/workflows/test.yml'
     branches:
       - main
   pull_request:
     paths:
       - 'lib/**'
-      - '!lib/l10n/**'
       - 'test/**'
       - 'pubspec.yaml'
       - 'pubspec.lock'
       - 'analysis_options.yaml'
-      - 'build.yaml'
       - '.github/workflows/test.yml'
     branches:
       - main
@@ -52,36 +48,16 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Code generation
-        run: dart run build_runner build
-
       - name: Verify formatting
-        run: |
-          mapfile -t lib_files < <(find lib/src -name "*.dart" -not \( -name "*.*freezed.dart" -o -name "*.*g.dart" -o -name "*lichess_icons.dart" \) )
-          mapfile -t test_files < <(find test -name "*.dart" -not \( -name "*.*freezed.dart" -o -name "*.*g.dart" \) )
-          dart format --output=none --set-exit-if-changed "${lib_files[@]}"
-          dart format --output=none --set-exit-if-changed "${test_files[@]}"
-        # run: dart format --output=none --set-exit-if-changed .
+        run: dart format --output=none --set-exit-if-changed lib test
 
       - name: Analyze project source
         run: flutter analyze
 
-      # - name: Run riverpod lint
-      #   run: dart run custom_lint
-
-  # The test files are split across parallel jobs. Each job compiles only its own files, which
-  # `--total-shards` does not do: it compiles every file in every shard and splits the test cases.
   unit-test:
-    name: Unit tests (shard ${{ matrix.shard }})
+    name: Unit and widget tests
     runs-on: ubuntu-latest
-    # A hung widget test otherwise occupies a runner until the 6 hour default.
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [0, 1, 2]
-    env:
-      TOTAL_SHARDS: 3
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -91,19 +67,8 @@ jobs:
           cache: true
           flutter-version-file: pubspec.yaml
 
-      - name: Install requirements for sqflite_common_ffi package
-        run: sudo apt-get -y install libsqlite3-0 libsqlite3-dev
-
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Code generation
-        run: dart run build_runner build
-
-      - name: Run unit tests
-        env:
-          SHARD: ${{ matrix.shard }}
-        run: |
-          mapfile -t files < <(find test -name '*_test.dart' | sort | awk -v n="$TOTAL_SHARDS" -v i="$SHARD" 'NR % n == i')
-          flutter test "${files[@]}"
-
+      - name: Run tests
+        run: flutter test

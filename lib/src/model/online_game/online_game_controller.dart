@@ -107,7 +107,8 @@ class OnlineGameController extends AsyncNotifier<OnlineGameState> {
       }
       socket.send('game/disconnect', {'game_id': gameId});
     });
-    _connect();
+    // When the socket is still connecting, the status listener above connects to the game.
+    if (socket.isConnected) _connect();
     return await first.future;
   }
 

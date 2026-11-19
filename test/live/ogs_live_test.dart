@@ -1,8 +1,6 @@
 @Tags(['live'])
 library;
 
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:tengen/src/constants.dart';
@@ -25,8 +23,12 @@ List<String> replayWithValidation(OgsGameData data) {
     'free_handicap_placement': data.freeHandicapPlacement,
     'initial_player': data.initialPlayer.name,
     'initial_state': {
-      'black': data.initialBlack.map((p) => '${String.fromCharCode(97 + p.x)}${String.fromCharCode(97 + p.y)}').join(),
-      'white': data.initialWhite.map((p) => '${String.fromCharCode(97 + p.x)}${String.fromCharCode(97 + p.y)}').join(),
+      'black': data.initialBlack
+          .map((p) => '${String.fromCharCode(97 + p.x)}${String.fromCharCode(97 + p.y)}')
+          .join(),
+      'white': data.initialWhite
+          .map((p) => '${String.fromCharCode(97 + p.x)}${String.fromCharCode(97 + p.y)}')
+          .join(),
     },
     'moves': const <Object?>[],
   });
@@ -67,22 +69,24 @@ void main() {
         'limit': 15,
       }),
     )!;
-    final entries = [
-      for (final g in asList(list['results'])) GameListEntry.fromJson(asMap(g)!),
-    ];
+    final entries = [for (final g in asList(list['results'])) GameListEntry.fromJson(asMap(g)!)];
     expect(entries, isNotEmpty);
     var checkedMoves = 0;
     for (final entry in entries) {
       final gamedata = socket.on('game/${entry.id}/gamedata').first;
       socket.send('game/connect', {'game_id': entry.id, 'chat': false});
-      final data = OgsGameData.fromJson(asMap(await gamedata.timeout(const Duration(seconds: 10)))!);
+      final data = OgsGameData.fromJson(
+        asMap(await gamedata.timeout(const Duration(seconds: 10)))!,
+      );
       socket.send('game/disconnect', {'game_id': entry.id});
       final errors = replayWithValidation(data);
       checkedMoves += data.moves.length;
       // ignore: avoid_print
-      print('game ${entry.id} ${data.width}x${data.height} ${data.ruleset.name} '
-          'h${data.handicap} free=${data.freeHandicapPlacement} moves=${data.moves.length} '
-          'errors=$errors');
+      print(
+        'game ${entry.id} ${data.width}x${data.height} ${data.ruleset.name} '
+        'h${data.handicap} free=${data.freeHandicapPlacement} moves=${data.moves.length} '
+        'errors=$errors',
+      );
       expect(errors, isEmpty, reason: 'game ${entry.id}');
       expect(data.buildGame().toMove, isNotNull);
     }
@@ -131,8 +135,10 @@ void main() {
         final blackPrisoners = asInt(asMap(score['black'])!['prisoners']);
         final whitePrisoners = asInt(asMap(score['white'])!['prisoners']);
         // ignore: avoid_print
-        print('game $id ${data.ruleset.name}: B ${game.position.blackCaptures}+$deadWhite '
-            'vs $blackPrisoners, W ${game.position.whiteCaptures}+$deadBlack vs $whitePrisoners');
+        print(
+          'game $id ${data.ruleset.name}: B ${game.position.blackCaptures}+$deadWhite '
+          'vs $blackPrisoners, W ${game.position.whiteCaptures}+$deadBlack vs $whitePrisoners',
+        );
         expect(game.position.blackCaptures + deadWhite, blackPrisoners, reason: 'game $id');
         expect(game.position.whiteCaptures + deadBlack, whitePrisoners, reason: 'game $id');
         compared++;
