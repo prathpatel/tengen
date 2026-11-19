@@ -3,20 +3,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/constants.dart';
 import 'package:tengen/src/model/go/board.dart';
+import 'package:tengen/src/model/go/result.dart';
 import 'package:tengen/src/model/go/scoring.dart';
 import 'package:tengen/src/model/go/sgf.dart';
 import 'package:tengen/src/model/ogs/game_data.dart';
 import 'package:tengen/src/model/ogs/ogs_socket_provider.dart';
+import 'package:tengen/src/model/online_game/automatch_controller.dart';
 import 'package:tengen/src/model/online_game/online_game_controller.dart';
 import 'package:tengen/src/model/settings/preferences.dart';
 import 'package:tengen/src/network/socket.dart';
 import 'package:tengen/src/utils/navigation.dart';
+import 'package:tengen/src/view/analysis/analysis_screen.dart';
 import 'package:tengen/src/view/online_game/game_chat_sheet.dart';
 import 'package:tengen/src/view/user/player_screen.dart';
 import 'package:tengen/src/widgets/game_layout.dart';
 import 'package:tengen/src/widgets/goban.dart';
 import 'package:tengen/src/widgets/move_list.dart';
 import 'package:tengen/src/widgets/player_bar.dart';
+import 'package:tengen/src/widgets/result_dialog.dart';
 
 /// Plays or watches a game on online-go.com.
 class OnlineGameScreen extends ConsumerStatefulWidget {
@@ -37,6 +41,49 @@ class _OnlineGameScreenState extends ConsumerState<OnlineGameScreen> {
 
   int get gameId => widget.gameId;
 
+  void _openAnalysis(OnlineGameState s) => pushFullScreen<void>(
+    context,
+    AnalysisScreen(
+      game: s.game,
+      blackName: s.data.black.username,
+      whiteName: s.data.white.username,
+    ),
+  );
+
+  /// Shows the result when the game ends while it is open.
+  void _announceResult() {
+    final s = ref.read(onlineGameProvider(gameId)).value;
+    if (s == null || !mounted) return;
+    final winner = s.data.winner;
+    final result = describeResult(outcome: s.data.outcome, winner: winner);
+    final tc = s.data.timeControl;
+    final again = ref
+        .read(automatchSettingsProvider)
+        .sameAs(width: s.data.width, height: s.data.height, speed: tc?.speed, system: tc?.system);
+    showResultDialog(
+      context,
+      result: GameResultText(
+        result.short,
+        winner == null
+            ? result.description
+            : '${s.myColor == null ? '' : (winner == s.myColor ? 'You won! ' : 'You lost. ')}'
+                  '${result.description}',
+      ),
+      actions: [
+        if (s.isPlayer && again != null)
+          (
+            label: 'New opponent',
+            primary: true,
+            onPressed: () {
+              Navigator.of(context).pop();
+              ref.read(automatchProvider.notifier).find(again);
+            },
+          ),
+        (label: 'Analysis board', primary: false, onPressed: () => _openAnalysis(s)),
+      ],
+    );
+  }
+
   void _showPly(int ply, int moveCount) =>
       setState(() => _reviewPly = ply >= moveCount ? null : ply.clamp(0, moveCount));
 
@@ -45,6 +92,12 @@ class _OnlineGameScreenState extends ConsumerState<OnlineGameScreen> {
     final provider = onlineGameProvider(gameId);
     final async = ref.watch(provider);
     final connected = ref.watch(socketStatusProvider).value == SocketStatus.connected;
+
+    ref.listen(provider.select((s) => s.value?.phase), (previous, phase) {
+      if (previous != null && previous != GamePhase.finished && phase == GamePhase.finished) {
+        _announceResult();
+      }
+    });
 
     ref.listen(provider.select((s) => s.value?.error), (_, error) {
       if (error != null) {
@@ -84,6 +137,7 @@ class _OnlineGameScreenState extends ConsumerState<OnlineGameScreen> {
           state: value,
           ply: (_reviewPly ?? value.game.moveCount).clamp(0, value.game.moveCount),
           onShowPly: (p) => _showPly(p, value.game.moveCount),
+          onOpenAnalysis: () => _openAnalysis(value),
           unreadChat: value.chat.length - (_seenChat ??= value.chat.length),
           onOpenChat: () async {
             await showGameChat(context, gameId);
@@ -112,6 +166,7 @@ class _OnlineGameBody extends ConsumerWidget {
     required this.onShowPly,
     required this.unreadChat,
     required this.onOpenChat,
+    required this.onOpenAnalysis,
   });
 
   final int gameId;
@@ -122,6 +177,7 @@ class _OnlineGameBody extends ConsumerWidget {
   final ValueChanged<int> onShowPly;
   final int unreadChat;
   final VoidCallback onOpenChat;
+  final VoidCallback onOpenAnalysis;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -166,6 +222,22 @@ class _OnlineGameBody extends ConsumerWidget {
         title: 'Your opponent asks to undo their last move',
         actions: [FilledButton(onPressed: controller.acceptUndo, child: const Text('Accept'))],
       );
+    } else if (live && state.stallingEstimate != null && phase == GamePhase.play) {
+      final estimate = state.stallingEstimate!;
+      banner = GameBanner(
+        title: 'The game looks finished',
+        message:
+            'OGS predicts ${data.player(estimate.winner).username} wins '
+            '(${(estimate.winRate * 100).toStringAsFixed(1)}%). If a player keeps playing '
+            'useless moves instead of passing, the game can end with this result.',
+        actions: [
+          if (state.isPlayer)
+            FilledButton(
+              onPressed: () => controller.preventStalling(estimate.winner),
+              child: const Text('End game with this result'),
+            ),
+        ],
+      );
     } else if (live && removal) {
       banner = GameBanner(
         title: 'Stone removal${score != null ? ': ${score.resultString} (estimate)' : ''}',
@@ -181,13 +253,21 @@ class _OnlineGameBody extends ConsumerWidget {
       );
     } else if (live && finished) {
       final winner = data.winner;
+      final result = describeResult(outcome: data.outcome, winner: winner);
       banner = GameBanner(
         title: winner == null
-            ? 'Game over'
-            : '${data.player(winner).username} wins${_outcomeSuffix(data.outcome)}',
+            ? result.short
+            : '${result.short}  ·  ${data.player(winner).username} wins',
+        message: result.description,
       );
     } else if (live && (game.position.lastMove?.isPass ?? false)) {
-      banner = GameBanner(title: '${data.player(game.position.lastMove!.color).username} passed');
+      final passer = game.position.lastMove!.color;
+      banner = GameBanner(
+        title: '${data.player(passer).username} passed',
+        message: state.isPlayer && passer != state.myColor
+            ? 'If nothing useful is left to play, pass too: the game then goes to counting.'
+            : null,
+      );
     }
 
     final canAct = state.isPlayer && phase == GamePhase.play;
@@ -219,6 +299,14 @@ class _OnlineGameBody extends ConsumerWidget {
                   }
                 },
               ),
+            ListTile(
+              leading: const Icon(Icons.biotech_outlined),
+              title: const Text('Analysis board'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                onOpenAnalysis();
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.copy_all_outlined),
               title: const Text('Copy SGF'),
@@ -328,13 +416,6 @@ class _OnlineGameBody extends ConsumerWidget {
         ),
       ],
     );
-  }
-
-  static String _outcomeSuffix(String? outcome) {
-    if (outcome == null || outcome.isEmpty) return '';
-    final points = double.tryParse(outcome.split(' ').first);
-    if (points != null) return ' by $outcome';
-    return ' by ${outcome.toLowerCase()}';
   }
 }
 

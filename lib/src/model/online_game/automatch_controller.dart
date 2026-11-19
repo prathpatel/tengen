@@ -140,6 +140,24 @@ class AutomatchSettings {
     },
   };
 
+  /// The same kind of game as [width]×[height] at [speed] with the [system] clock, keeping the
+  /// other preferences. Null when the quick match does not offer it.
+  AutomatchSettings? sameAs({
+    required int width,
+    required int height,
+    required String? speed,
+    required String? system,
+  }) {
+    if (width != height || !const [9, 13, 19].contains(width)) return null;
+    final s = GameSpeed.values.where((v) => v.name == speed).firstOrNull;
+    if (s == null) return null;
+    return copyWith(
+      size: width,
+      speed: s,
+      system: system == 'byoyomi' ? ClockSystem.byoyomi : ClockSystem.fischer,
+    );
+  }
+
   AutomatchSettings copyWith({
     int? size,
     GameSpeed? speed,

@@ -208,4 +208,36 @@ void main() {
     await pumpEventQueue();
     expect((await read()).chat, isEmpty);
   });
+
+  test('anti-stalling: shows the OGS estimate and ends the game with it', () async {
+    final (:socket, :controller, :read) = await setUpGame(userId: 99);
+    socket.serverSend('game/7/stalling_score_estimate', {
+      'game_id': 7,
+      'move_number': 1,
+      'predicted_winner': 'black',
+      'win_rate': 0.97,
+      'score': 12.5,
+      'removed': '',
+      'ownership': <Object?>[],
+    });
+    await pumpEventQueue();
+    final estimate = (await read()).stallingEstimate!;
+    expect(estimate.winner, StoneColor.black);
+    expect(estimate.winRate, closeTo(0.97, 1e-9));
+
+    controller.preventStalling(estimate.winner);
+    expect(socket.sentCommands('game/prevent_stalling').single[1], {
+      'game_id': 7,
+      'winner': 'black',
+    });
+
+    // A new move makes the estimate stale.
+    socket.serverSend('game/7/move', {
+      'game_id': 7,
+      'move_number': 2,
+      'move': [5, 5, 100],
+    });
+    await pumpEventQueue();
+    expect((await read()).stallingEstimate, isNull);
+  });
 }

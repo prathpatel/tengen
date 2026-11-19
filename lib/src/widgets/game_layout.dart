@@ -130,13 +130,29 @@ class GameLayout extends StatelessWidget {
           children: [
             ?moveList,
             Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+              // The players and board are laid out first, as if there were no banner, and the
+              // banner gets the space left below them: a banner appearing must never move the
+              // board under the player's finger.
+              child: CustomMultiChildLayout(
+                delegate: _GameAreaLayout(),
                 children: [
-                  topPlayer,
-                  Flexible(child: paddedBoard),
-                  bottomPlayer,
-                  ?banner,
+                  LayoutId(
+                    id: _GameAreaLayout.group,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: 8),
+                        topPlayer,
+                        Flexible(child: paddedBoard),
+                        bottomPlayer,
+                      ],
+                    ),
+                  ),
+                  if (banner != null)
+                    LayoutId(
+                      id: _GameAreaLayout.banner,
+                      child: SingleChildScrollView(child: banner),
+                    ),
                 ],
               ),
             ),
@@ -227,4 +243,41 @@ class GameBanner extends StatelessWidget {
       ),
     );
   }
+}
+
+class _GameAreaLayout extends MultiChildLayoutDelegate {
+  static const group = 'group';
+  static const banner = 'banner';
+
+  /// Height always kept free below the players for banners. Banners shown during play (a pass)
+  /// fit in it, so the board never moves while the player is tapping it. Taller banners
+  /// (counting, result) take the space they need, shrinking the board when the phase changes.
+  static const bannerReserve = 112.0;
+
+  @override
+  void performLayout(Size size) {
+    final bannerHeight = hasChild(banner)
+        ? layoutChild(
+            banner,
+            BoxConstraints(
+              minWidth: size.width,
+              maxWidth: size.width,
+              maxHeight: size.height * 0.45,
+            ),
+          ).height
+        : 0.0;
+    final reserve = bannerHeight > bannerReserve ? bannerHeight : bannerReserve;
+    final groupSize = layoutChild(
+      group,
+      BoxConstraints(
+        maxWidth: size.width,
+        maxHeight: (size.height - reserve).clamp(0, size.height),
+      ),
+    );
+    positionChild(group, Offset((size.width - groupSize.width) / 2, 0));
+    if (hasChild(banner)) positionChild(banner, Offset(0, groupSize.height));
+  }
+
+  @override
+  bool shouldRelayout(_GameAreaLayout oldDelegate) => false;
 }

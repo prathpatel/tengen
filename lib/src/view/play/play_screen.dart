@@ -8,6 +8,7 @@ import 'package:tengen/src/model/online_game/automatch_controller.dart';
 import 'package:tengen/src/utils/navigation.dart';
 import 'package:tengen/src/view/auth/sign_in_screen.dart';
 import 'package:tengen/src/view/offline_game/offline_game_screen.dart';
+import 'package:tengen/src/widgets/segmented_choice.dart';
 
 /// Starts a game: online with the OGS automatch, or offline on the device.
 class PlayScreen extends StatelessWidget {
@@ -47,22 +48,69 @@ class _Labeled extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: Theme.of(context).textTheme.labelLarge),
-        const SizedBox(height: 6),
+        Text(label, style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
         child,
       ],
     ),
   );
 }
 
-Widget _sizeSelector(int size, ValueChanged<int> onChanged) => SegmentedButton<int>(
-  segments: const [
-    ButtonSegment(value: 9, label: Text('9×9')),
-    ButtonSegment(value: 13, label: Text('13×13')),
-    ButtonSegment(value: 19, label: Text('19×19')),
-  ],
-  selected: {size},
-  onSelectionChanged: (s) => onChanged(s.first),
+/// A scrolling form with its main button pinned at the bottom, above the system navigation bar.
+/// The content is capped in width on tablets.
+class _FormWithAction extends StatelessWidget {
+  const _FormWithAction({required this.children, required this.action});
+
+  final List<Widget> children;
+  final Widget action;
+
+  static const maxWidth = 560.0;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      Expanded(
+        child: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          children: [
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: maxWidth),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+              ),
+            ),
+          ],
+        ),
+      ),
+      DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.3),
+            ),
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: maxWidth),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: SizedBox(width: double.infinity, height: 52, child: action),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _sizeSelector(int size, ValueChanged<int> onChanged) => SegmentedChoice<int>(
+  choices: const [Choice(9, '9×9'), Choice(13, '13×13'), Choice(19, '19×19')],
+  selected: size,
+  onChanged: onChanged,
 );
 
 class _OnlinePlay extends ConsumerStatefulWidget {
@@ -127,8 +175,18 @@ class _OnlinePlayState extends ConsumerState<_OnlinePlay> {
       );
     }
 
-    return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+    return _FormWithAction(
+      action: FilledButton.icon(
+        icon: const Icon(Icons.search),
+        label: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            'Play ${settings.size}×${settings.size} '
+            '${settings.speed.shortLabel.toLowerCase()} · ${settings.timeLabel}',
+          ),
+        ),
+        onPressed: () => ref.read(automatchProvider.notifier).find(settings),
+      ),
       children: [
         _Labeled(
           'Board size',
@@ -143,23 +201,51 @@ class _OnlinePlayState extends ConsumerState<_OnlinePlay> {
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Material(
                     color: settings.speed == speed
-                        ? scheme.primaryContainer
+                        ? scheme.secondaryContainer
                         : scheme.surfaceContainer,
-                    borderRadius: BorderRadius.circular(12),
-                    child: ListTile(
-                      dense: true,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      title: Text(speed.label, style: theme.textTheme.titleSmall),
-                      subtitle: Text(speed.estimate(settings.size)),
-                      trailing: Text(
-                        quickMatchTime(
-                          settings.size,
-                          speed,
-                          speed == GameSpeed.correspondence ? ClockSystem.fischer : settings.system,
-                        ),
-                        style: theme.textTheme.titleSmall,
-                      ),
+                    borderRadius: BorderRadius.circular(14),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
                       onTap: () => update(settings.copyWith(speed: speed)),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    speed.label,
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: settings.speed == speed
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                    ),
+                                  ),
+                                  Text(
+                                    speed.estimate(settings.size),
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              quickMatchTime(
+                                settings.size,
+                                speed,
+                                speed == GameSpeed.correspondence
+                                    ? ClockSystem.fischer
+                                    : settings.system,
+                              ),
+                              style: theme.textTheme.titleSmall,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -169,19 +255,18 @@ class _OnlinePlayState extends ConsumerState<_OnlinePlay> {
         if (settings.speed != GameSpeed.correspondence) ...[
           _Labeled(
             'Clock',
-            SegmentedButton<ClockSystem>(
-              segments: [
-                for (final c in ClockSystem.values) ButtonSegment(value: c, label: Text(c.label)),
-              ],
-              selected: {settings.system},
-              onSelectionChanged: (v) => update(settings.copyWith(system: v.first)),
+            SegmentedChoice<ClockSystem>(
+              choices: [for (final c in ClockSystem.values) Choice(c, c.label)],
+              selected: settings.system,
+              onChanged: (v) => update(settings.copyWith(system: v)),
             ),
           ),
           SwitchListTile(
             title: const Text('Flexible clock'),
             subtitle: Text(
               settings.flexibleClock
-                  ? 'Also accept ${settings.system == ClockSystem.fischer ? 'byo-yomi' : 'Fischer'} to find a game faster'
+                  ? 'Also accept ${settings.system == ClockSystem.fischer ? 'byo-yomi' : 'Fischer'} '
+                        'to find a game faster'
                   : 'Only ${settings.system.label}',
             ),
             value: settings.flexibleClock,
@@ -190,12 +275,10 @@ class _OnlinePlayState extends ConsumerState<_OnlinePlay> {
         ],
         _Labeled(
           'Handicaps',
-          SegmentedButton<HandicapMode>(
-            segments: [
-              for (final h in HandicapMode.values) ButtonSegment(value: h, label: Text(h.label)),
-            ],
-            selected: {settings.handicap},
-            onSelectionChanged: (v) => update(settings.copyWith(handicap: v.first)),
+          SegmentedChoice<HandicapMode>(
+            choices: [for (final h in HandicapMode.values) Choice(h, h.label)],
+            selected: settings.handicap,
+            onChanged: (v) => update(settings.copyWith(handicap: v)),
           ),
         ),
         Padding(
@@ -225,20 +308,10 @@ class _OnlinePlayState extends ConsumerState<_OnlinePlay> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Text(
             'OGS quick match games use Japanese rules.',
             style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: FilledButton.icon(
-            icon: const Icon(Icons.search),
-            label: Text(
-              'Play ${settings.size}×${settings.size} ${settings.speed.shortLabel.toLowerCase()} · ${settings.timeLabel}',
-            ),
-            onPressed: () => ref.read(automatchProvider.notifier).find(settings),
           ),
         ),
       ],
@@ -261,26 +334,22 @@ class _OfflinePlayState extends State<_OfflinePlay> {
   @override
   Widget build(BuildContext context) {
     final maxHandicap = _setup.size == 9 ? 5 : 9;
-    return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+    return _FormWithAction(
+      action: FilledButton.icon(
+        icon: const Icon(Icons.play_arrow),
+        label: const Text('Start game'),
+        onPressed: () => pushFullScreen<void>(context, OfflineGameScreen(setup: _setup)),
+      ),
       children: [
         _Labeled(
           'Opponent',
-          SegmentedButton<OfflineOpponent>(
-            segments: const [
-              ButtonSegment(
-                value: OfflineOpponent.bot,
-                icon: Icon(Icons.smart_toy_outlined),
-                label: Text('Computer'),
-              ),
-              ButtonSegment(
-                value: OfflineOpponent.human,
-                icon: Icon(Icons.people_outline),
-                label: Text('Pass and play'),
-              ),
+          SegmentedChoice<OfflineOpponent>(
+            choices: const [
+              Choice(OfflineOpponent.bot, 'Computer', icon: Icons.smart_toy_outlined),
+              Choice(OfflineOpponent.human, 'Pass and play', icon: Icons.people_outline),
             ],
-            selected: {_setup.opponent},
-            onSelectionChanged: (s) => _update((x) => x.copyWith(opponent: s.first)),
+            selected: _setup.opponent,
+            onChanged: (v) => _update((x) => x.copyWith(opponent: v)),
           ),
         ),
         _Labeled(
@@ -294,13 +363,10 @@ class _OfflinePlayState extends State<_OfflinePlay> {
         if (_setup.opponent == OfflineOpponent.bot)
           _Labeled(
             'Your color',
-            SegmentedButton<StoneColor>(
-              segments: const [
-                ButtonSegment(value: StoneColor.black, label: Text('Black')),
-                ButtonSegment(value: StoneColor.white, label: Text('White')),
-              ],
-              selected: {_setup.humanColor},
-              onSelectionChanged: (s) => _update((x) => x.copyWith(humanColor: s.first)),
+            SegmentedChoice<StoneColor>(
+              choices: const [Choice(StoneColor.black, 'Black'), Choice(StoneColor.white, 'White')],
+              selected: _setup.humanColor,
+              onChanged: (v) => _update((x) => x.copyWith(humanColor: v)),
             ),
           ),
         ListTile(
@@ -327,16 +393,8 @@ class _OfflinePlayState extends State<_OfflinePlay> {
         ),
         ListTile(
           title: const Text('Komi'),
-          trailing: Text('${_setup.effectiveKomi}'),
+          trailing: Text('${_setup.effectiveKomi}', style: Theme.of(context).textTheme.titleMedium),
           subtitle: Text(_setup.ruleset.areaScoring ? 'Area scoring' : 'Territory scoring'),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: FilledButton.icon(
-            icon: const Icon(Icons.play_arrow),
-            label: const Text('Start game'),
-            onPressed: () => pushFullScreen<void>(context, OfflineGameScreen(setup: _setup)),
-          ),
         ),
       ],
     );

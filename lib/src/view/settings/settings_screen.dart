@@ -4,6 +4,7 @@ import 'package:tengen/src/model/go/board.dart';
 import 'package:tengen/src/model/settings/preferences.dart';
 import 'package:tengen/src/widgets/board_thumbnail.dart';
 import 'package:tengen/src/widgets/list_section.dart';
+import 'package:tengen/src/widgets/segmented_choice.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -90,18 +91,24 @@ class SettingsScreen extends ConsumerWidget {
           const SectionHeader('App'),
           CardSection(
             children: [
-              ListTile(
-                leading: const Icon(Icons.brightness_6_outlined),
-                title: const Text('Theme'),
-                trailing: SegmentedButton<AppThemeMode>(
-                  showSelectedIcon: false,
-                  segments: const [
-                    ButtonSegment(value: AppThemeMode.system, label: Text('Auto')),
-                    ButtonSegment(value: AppThemeMode.light, label: Text('Light')),
-                    ButtonSegment(value: AppThemeMode.dark, label: Text('Dark')),
-                  ],
-                  selected: {prefs.themeMode},
-                  onSelectionChanged: (s) => controller.setThemeMode(s.first),
+              const ListTile(
+                leading: Icon(Icons.brightness_6_outlined),
+                title: Text('Theme'),
+                subtitle: Text('Auto follows the phone setting'),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: SegmentedChoice<AppThemeMode>(
+                    choices: const [
+                      Choice(AppThemeMode.system, 'Auto', icon: Icons.brightness_auto_outlined),
+                      Choice(AppThemeMode.light, 'Light', icon: Icons.light_mode_outlined),
+                      Choice(AppThemeMode.dark, 'Dark', icon: Icons.dark_mode_outlined),
+                    ],
+                    selected: prefs.themeMode,
+                    onChanged: controller.setThemeMode,
+                  ),
                 ),
               ),
             ],

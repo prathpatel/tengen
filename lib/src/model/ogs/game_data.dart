@@ -54,6 +54,7 @@ class OgsGameData {
     this.removed = const {},
     this.outcome,
     this.winnerId,
+    this.stallingScoreEstimate,
   });
 
   factory OgsGameData.fromJson(Map<String, dynamic> json) {
@@ -89,6 +90,7 @@ class OgsGameData {
       removed: removed is String ? decodeOgsMoves(removed).nonNulls.toSet() : const {},
       outcome: json['outcome'] as String?,
       winnerId: asInt(json['winner']),
+      stallingScoreEstimate: asMap(json['stalling_score_estimate']),
     );
   }
 
@@ -117,6 +119,9 @@ class OgsGameData {
   final Set<Point> removed;
   final String? outcome;
   final int? winnerId;
+
+  /// The raw anti-stalling estimate, when OGS considers the game over.
+  final Map<String, dynamic>? stallingScoreEstimate;
 
   StoneColor? get winner => winnerId == null
       ? null
@@ -189,6 +194,7 @@ class OgsGameData {
     removed: removed ?? this.removed,
     outcome: outcome ?? this.outcome,
     winnerId: winnerId ?? this.winnerId,
+    stallingScoreEstimate: stallingScoreEstimate,
   );
 }
 

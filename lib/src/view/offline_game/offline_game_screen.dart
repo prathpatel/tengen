@@ -2,14 +2,17 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/model/go/board.dart';
+import 'package:tengen/src/model/go/result.dart';
 import 'package:tengen/src/model/go/sgf.dart';
 import 'package:tengen/src/model/offline_game/offline_game_controller.dart';
 import 'package:tengen/src/model/settings/preferences.dart';
 import 'package:tengen/src/utils/navigation.dart';
+import 'package:tengen/src/view/analysis/analysis_screen.dart';
 import 'package:tengen/src/widgets/game_layout.dart';
 import 'package:tengen/src/widgets/goban.dart';
 import 'package:tengen/src/widgets/move_list.dart';
 import 'package:tengen/src/widgets/player_bar.dart';
+import 'package:tengen/src/widgets/result_dialog.dart';
 
 /// A game played on the device, against the computer or pass and play.
 class OfflineGameScreen extends ConsumerStatefulWidget {
@@ -35,6 +38,15 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
     return color == setup.botColor ? 'Computer' : 'You';
   }
 
+  void _openAnalysis(OfflineGameState s) => pushFullScreen<void>(
+    context,
+    AnalysisScreen(
+      game: s.game,
+      blackName: _name(StoneColor.black),
+      whiteName: _name(StoneColor.white),
+    ),
+  );
+
   void _showPly(int ply, int moveCount) =>
       setState(() => _reviewPly = ply >= moveCount ? null : ply.clamp(0, moveCount));
 
@@ -44,6 +56,35 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
     final state = ref.watch(provider);
     final controller = ref.read(provider.notifier);
     final prefs = ref.watch(preferencesProvider);
+    ref.listen(provider.select((s) => s.phase), (previous, phase) {
+      if (previous != OfflinePhase.finished && phase == OfflinePhase.finished) {
+        final s = ref.read(provider);
+        final result = describeResult(outcome: s.result, winner: null);
+        final bot = setup.botColor;
+        final won = bot != null && s.result != null && !s.result!.startsWith(bot.code);
+        showResultDialog(
+          context,
+          result: GameResultText(
+            result.short,
+            bot == null
+                ? result.description
+                : '${won ? 'You won! ' : 'The computer won. '}${result.description}',
+          ),
+          actions: [
+            (
+              label: 'New game',
+              primary: true,
+              onPressed: () {
+                setState(() => _reviewPly = null);
+                controller.restart();
+              },
+            ),
+            (label: 'Analysis board', primary: false, onPressed: () => _openAnalysis(s)),
+          ],
+        );
+      }
+    });
+
     final game = state.game;
     final ply = (_reviewPly ?? game.moveCount).clamp(0, game.moveCount);
     final live = ply == game.moveCount;
@@ -140,6 +181,14 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
                   setState(() => _reviewPly = null);
                   controller.restart();
                 }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.biotech_outlined),
+              title: const Text('Analysis board'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _openAnalysis(state);
               },
             ),
             ListTile(

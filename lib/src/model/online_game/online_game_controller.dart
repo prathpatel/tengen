@@ -23,6 +23,7 @@ class OnlineGameState {
     this.undoRequestedAt,
     this.error,
     this.chat = const [],
+    this.stallingEstimate,
   });
 
   final OgsGameData data;
@@ -43,6 +44,10 @@ class OnlineGameState {
   /// The game chat (players and spectators), oldest first.
   final List<GameChatLine> chat;
 
+  /// Sent by OGS when it considers the game over while a player keeps playing (anti-stalling):
+  /// the predicted winner and its probability.
+  final ({StoneColor winner, double winRate})? stallingEstimate;
+
   bool get isPlayer => myColor != null;
   GamePhase get phase => data.phase;
   bool get isMyTurn =>
@@ -55,6 +60,7 @@ class OnlineGameState {
     int? Function()? undoRequestedAt,
     String? Function()? error,
     List<GameChatLine>? chat,
+    ({StoneColor winner, double winRate})? Function()? stallingEstimate,
   }) => OnlineGameState(
     data: data ?? this.data,
     game: game ?? this.game,
@@ -63,6 +69,7 @@ class OnlineGameState {
     undoRequestedAt: undoRequestedAt != null ? undoRequestedAt() : this.undoRequestedAt,
     error: error != null ? error() : this.error,
     chat: chat ?? this.chat,
+    stallingEstimate: stallingEstimate != null ? stallingEstimate() : this.stallingEstimate,
   );
 }
 
@@ -130,6 +137,9 @@ class OnlineGameController extends AsyncNotifier<OnlineGameState> {
     game: data.buildGame(),
     myColor: data.colorOf(_userId),
     chat: chat,
+    stallingEstimate: data.phase == GamePhase.play
+        ? parseStallingEstimate(data.stallingScoreEstimate)
+        : null,
   );
 
   static List<GameChatLine> _addChat(List<GameChatLine> chat, Object? event) {
@@ -156,6 +166,8 @@ class OnlineGameController extends AsyncNotifier<OnlineGameState> {
           game: s.game.playMove(GoMove(s.game.toMove, point), validate: false),
           pendingMove: () => null,
           undoRequestedAt: () => null,
+          // A new move makes the previous estimate stale; OGS sends a new one if needed.
+          stallingEstimate: () => null,
         );
       case 'clock':
         final json = asMap(payload);
@@ -196,6 +208,8 @@ class OnlineGameController extends AsyncNotifier<OnlineGameState> {
       case 'chat/remove':
         final ids = asList(asMap(payload)?['chat_ids']).whereType<String>().toSet();
         return s.copyWith(chat: s.chat.where((l) => !ids.contains(l.id)).toList());
+      case 'stalling_score_estimate':
+        return s.copyWith(stallingEstimate: () => parseStallingEstimate(payload));
       case 'error':
         return s.copyWith(error: () => payload?.toString() ?? 'Error', pendingMove: () => null);
       default:
@@ -268,6 +282,11 @@ class OnlineGameController extends AsyncNotifier<OnlineGameState> {
 
   void clearError() => _update((s) => s.copyWith(error: () => null));
 
+  /// Ends a stalled game with the winner predicted by OGS (`game/prevent_stalling`). The server
+  /// only accepts it when it agrees with the outcome.
+  void preventStalling(StoneColor winner) =>
+      _socket.send('game/prevent_stalling', {'game_id': gameId, 'winner': winner.name});
+
   /// Sends a chat message. OGS shows it to the players, or to the spectators when sent by one.
   void sendChat(String text) {
     final s = state.value;
@@ -280,4 +299,17 @@ class OnlineGameController extends AsyncNotifier<OnlineGameState> {
       'body': body,
     });
   }
+}
+
+/// Parses a `stalling_score_estimate` (`{predicted_winner, win_rate, ...}`).
+({StoneColor winner, double winRate})? parseStallingEstimate(Object? json) {
+  final map = asMap(json);
+  final winner = map?['predicted_winner'];
+  if (winner != 'black' && winner != 'white') return null;
+  final rate = asDouble(map!['win_rate']) ?? 0.5;
+  return (
+    winner: winner == 'black' ? StoneColor.black : StoneColor.white,
+    // Shown like the OGS website does: the probability of the more likely result.
+    winRate: rate > 0.5 ? rate : 1 - rate,
+  );
 }

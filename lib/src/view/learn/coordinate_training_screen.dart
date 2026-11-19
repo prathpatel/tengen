@@ -9,6 +9,7 @@ import 'package:tengen/src/model/go/coordinates.dart';
 import 'package:tengen/src/model/learn/lessons.dart';
 import 'package:tengen/src/model/settings/preferences.dart';
 import 'package:tengen/src/widgets/goban.dart';
+import 'package:tengen/src/widgets/segmented_choice.dart';
 
 /// Find as many coordinates as possible in 30 seconds, like the lichess coordinate trainer.
 class CoordinateTrainingScreen extends ConsumerStatefulWidget {
@@ -113,14 +114,10 @@ class _CoordinateTrainingScreenState extends ConsumerState<CoordinateTrainingScr
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: SegmentedButton<int>(
-                segments: const [
-                  ButtonSegment(value: 9, label: Text('9×9')),
-                  ButtonSegment(value: 13, label: Text('13×13')),
-                  ButtonSegment(value: 19, label: Text('19×19')),
-                ],
-                selected: {_size},
-                onSelectionChanged: _running ? null : (s) => setState(() => _size = s.first),
+              child: SegmentedChoice<int>(
+                choices: const [Choice(9, '9×9'), Choice(13, '13×13'), Choice(19, '19×19')],
+                selected: _size,
+                onChanged: _running ? null : (v) => setState(() => _size = v),
               ),
             ),
             Padding(

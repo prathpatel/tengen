@@ -100,4 +100,22 @@ void main() {
     await tester.pump();
     expect(container.read(offlineGameProvider(setup)).game.moveCount, 3);
   });
+
+  testWidgets('resigning shows the result dialog', (tester) async {
+    await pumpScreen(tester, confirmMoves: false);
+    await tester.tap(find.byTooltip('Menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Resign'));
+    await tester.pumpAndSettle();
+    // The confirmation dialog.
+    await tester.tap(find.widgetWithText(FilledButton, 'Resign'));
+    await tester.pumpAndSettle();
+    expect(find.text('W+R'), findsWidgets);
+    expect(find.text('Black resigned · White is victorious'), findsOneWidget);
+    expect(find.text('Analysis board'), findsOneWidget);
+    await tester.tap(find.descendant(of: find.byType(Dialog), matching: find.text('New game')));
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.text('W+R'), findsNothing);
+  });
 }

@@ -54,15 +54,38 @@ class HomeTabScreen extends ConsumerWidget {
             child: signedIn
                 ? GestureDetector(
                     onTap: () => pushInTab<void>(context, PlayerScreen(playerId: user.id)),
-                    child: Badge(
-                      smallSize: 10,
-                      backgroundColor: connected ? Colors.green : Colors.orange,
-                      alignment: AlignmentDirectional.bottomEnd,
-                      child: CircleAvatar(
-                        radius: 20,
-                        backgroundColor: theme.colorScheme.secondaryContainer,
-                        foregroundImage: user!.iconUrl != null ? NetworkImage(user.iconUrl!) : null,
-                        child: Text(user.username.characters.first.toUpperCase()),
+                    child: Tooltip(
+                      message: connected ? 'Online' : 'Connecting…',
+                      // An online status dot on the avatar's edge, ringed with the background
+                      // color so that it reads as attached to the picture.
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundColor: theme.colorScheme.secondaryContainer,
+                            foregroundImage: user!.iconUrl != null
+                                ? NetworkImage(user.iconUrl!)
+                                : null,
+                            child: Text(user.username.characters.first.toUpperCase()),
+                          ),
+                          Positioned(
+                            right: -1,
+                            bottom: -1,
+                            child: Container(
+                              width: 13,
+                              height: 13,
+                              decoration: BoxDecoration(
+                                color: connected ? Colors.green.shade500 : Colors.orange,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: theme.scaffoldBackgroundColor,
+                                  width: 2.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   )
