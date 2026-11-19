@@ -80,9 +80,11 @@ class OfflineGameScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          '${setup.size}×${setup.size} · ${setup.ruleset.label}'
-          '${setup.handicap > 1 ? ' · H${setup.handicap}' : ''}',
+        title: GameTitle(
+          title:
+              '${setup.size}×${setup.size} · ${setup.ruleset.label}'
+              '${setup.handicap > 1 ? ' · H${setup.handicap}' : ''}',
+          subtitle: moveSummary(game),
         ),
         actions: [
           IconButton(

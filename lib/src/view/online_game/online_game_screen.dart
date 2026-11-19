@@ -37,10 +37,13 @@ class OnlineGameScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(switch (async) {
-          AsyncData(:final value) => value.data.name.isEmpty ? 'Game $gameId' : value.data.name,
-          _ => 'Game $gameId',
-        }),
+        title: switch (async) {
+          AsyncData(:final value) => GameTitle(
+            title: value.data.name.isEmpty ? 'Game $gameId' : value.data.name,
+            subtitle: moveSummary(value.game),
+          ),
+          _ => Text('Game $gameId'),
+        },
         actions: [
           if (!connected)
             const Padding(

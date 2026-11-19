@@ -6,12 +6,14 @@ import 'package:tengen/src/model/offline_game/offline_game_controller.dart';
 import 'package:tengen/src/model/ogs/game_data.dart';
 import 'package:tengen/src/model/ogs/ogs_repository.dart';
 import 'package:tengen/src/model/ogs/ogs_socket_provider.dart';
+import 'package:tengen/src/model/ogs/user.dart';
 import 'package:tengen/src/network/socket.dart';
 import 'package:tengen/src/tab_scaffold.dart';
 import 'package:tengen/src/utils/navigation.dart';
 import 'package:tengen/src/view/auth/sign_in_screen.dart';
 import 'package:tengen/src/view/offline_game/offline_game_screen.dart';
 import 'package:tengen/src/view/online_game/online_game_screen.dart';
+import 'package:tengen/src/view/user/player_screen.dart';
 import 'package:tengen/src/widgets/game_tiles.dart';
 
 class HomeTabScreen extends ConsumerWidget {
@@ -51,7 +53,13 @@ class HomeTabScreen extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(vertical: 8),
           children: [
             switch (auth) {
-              AsyncData(:final value) when value.isSignedIn => _ActiveGames(userId: value.user.id),
+              AsyncData(:final value) when value.isSignedIn => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _ProfileCard(user: value.user),
+                  _ActiveGames(userId: value.user.id),
+                ],
+              ),
               AsyncLoading() => const Padding(
                 padding: EdgeInsets.all(24),
                 child: Center(child: CircularProgressIndicator()),
@@ -91,34 +99,50 @@ class HomeTabScreen extends ConsumerWidget {
               ),
             },
             const _SectionTitle('Quick start'),
-            ListTile(
-              leading: const Icon(Icons.smart_toy_outlined),
-              title: const Text('Play the computer'),
-              subtitle: const Text('9×9 · you play black'),
-              onTap: () =>
-                  pushFullScreen<void>(context, const OfflineGameScreen(setup: OfflineGameSetup())),
-            ),
-            ListTile(
-              leading: const Icon(Icons.people_outline),
-              title: const Text('Pass and play'),
-              subtitle: const Text('Two players on this device'),
-              onTap: () => pushFullScreen<void>(
-                context,
-                const OfflineGameScreen(
-                  setup: OfflineGameSetup(opponent: OfflineOpponent.human, size: 13),
-                ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 1.75,
+                children: [
+                  _QuickTile(
+                    icon: Icons.smart_toy_outlined,
+                    title: 'Play the computer',
+                    subtitle: '9×9 · you play black',
+                    onTap: () => pushFullScreen<void>(
+                      context,
+                      const OfflineGameScreen(setup: OfflineGameSetup()),
+                    ),
+                  ),
+                  _QuickTile(
+                    icon: Icons.people_outline,
+                    title: 'Pass and play',
+                    subtitle: '13×13 on this device',
+                    onTap: () => pushFullScreen<void>(
+                      context,
+                      const OfflineGameScreen(
+                        setup: OfflineGameSetup(opponent: OfflineOpponent.human, size: 13),
+                      ),
+                    ),
+                  ),
+                  _QuickTile(
+                    icon: Icons.bolt_outlined,
+                    title: 'Play online',
+                    subtitle: signedIn ? 'Find an opponent' : 'Sign in first',
+                    onTap: () => ref.read(currentTabProvider.notifier).current = BottomTab.play,
+                  ),
+                  _QuickTile(
+                    icon: Icons.live_tv_outlined,
+                    title: 'Watch',
+                    subtitle: 'Top live games',
+                    onTap: () => ref.read(currentTabProvider.notifier).current = BottomTab.watch,
+                  ),
+                ],
               ),
-            ),
-            if (signedIn)
-              ListTile(
-                leading: const Icon(Icons.bolt_outlined),
-                title: const Text('Find an online opponent'),
-                onTap: () => ref.read(currentTabProvider.notifier).current = BottomTab.play,
-              ),
-            ListTile(
-              leading: const Icon(Icons.live_tv_outlined),
-              title: const Text('Watch top live games'),
-              onTap: () => ref.read(currentTabProvider.notifier).current = BottomTab.watch,
             ),
           ],
         ),
@@ -190,6 +214,119 @@ class _ActiveGames extends ConsumerWidget {
           ),
         },
       ],
+    );
+  }
+}
+
+class _ProfileCard extends StatelessWidget {
+  const _ProfileCard({required this.user});
+
+  final OgsUser user;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final rank = user.rankLabel;
+    return Card(
+      elevation: 0,
+      color: scheme.primaryContainer,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => pushFullScreen<void>(context, PlayerScreen(playerId: user.id)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 26,
+                backgroundColor: scheme.primary,
+                foregroundImage: user.iconUrl != null ? NetworkImage(user.iconUrl!) : null,
+                child: Text(
+                  user.username.characters.first.toUpperCase(),
+                  style: theme.textTheme.titleLarge?.copyWith(color: scheme.onPrimary),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user.username,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: scheme.onPrimaryContainer,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      rank.isEmpty ? 'online-go.com' : 'Rank $rank · online-go.com',
+                      style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onPrimaryContainer),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: scheme.onPrimaryContainer),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickTile extends StatelessWidget {
+  const _QuickTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: scheme.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: scheme.secondaryContainer, shape: BoxShape.circle),
+                child: Icon(icon, color: scheme.onSecondaryContainer),
+              ),
+              const Spacer(),
+              Text(
+                title,
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

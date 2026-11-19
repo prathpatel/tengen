@@ -17,8 +17,19 @@ class StoneIcon extends StatelessWidget {
     height: size,
     decoration: BoxDecoration(
       shape: BoxShape.circle,
-      color: color == StoneColor.black ? Colors.black : Colors.white,
-      border: Border.all(color: Colors.grey.shade600, width: 0.8),
+      gradient: RadialGradient(
+        center: const Alignment(-0.35, -0.4),
+        colors: color == StoneColor.black
+            ? const [Color(0xFF5A5A5A), Color(0xFF111111)]
+            : const [Color(0xFFFFFFFF), Color(0xFFC8C8C8)],
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.35),
+          blurRadius: size * 0.12,
+          offset: Offset(0, size * 0.06),
+        ),
+      ],
     ),
   );
 }
@@ -39,60 +50,93 @@ class PlayerBar extends StatelessWidget {
   final StoneColor color;
   final String name;
   final String? subtitle;
+
+  /// Stones of the opponent captured by this player.
   final int captures;
 
   /// Whether it is this player's turn.
   final bool active;
 
-  /// The clock, for online games.
+  /// The clock, for online games, or a thinking indicator for the bot.
   final Widget? clock;
   final VoidCallback? onTapName;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Row(
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: active ? theme.colorScheme.primary : Colors.transparent,
-                width: 2,
-              ),
-            ),
-            child: StoneIcon(color, size: 20),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: InkWell(
-              onTap: onTapName,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    name,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: active ? FontWeight.bold : FontWeight.w500,
+    final scheme = theme.colorScheme;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: active ? scheme.primaryContainer : scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: active ? scheme.primary : Colors.transparent, width: 1.5),
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTapName,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 60),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                StoneIcon(color, size: 28),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        name,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: active ? scheme.onPrimaryContainer : null,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (subtitle != null)
+                        Text(
+                          subtitle!,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: active ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                ),
+                Tooltip(
+                  message: '$captures ${captures == 1 ? 'capture' : 'captures'}',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: scheme.surface.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    overflow: TextOverflow.ellipsis,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        StoneIcon(color.opposite, size: 12),
+                        const SizedBox(width: 5),
+                        Text(
+                          '$captures',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  Text(
-                    [?subtitle, '$captures ${captures == 1 ? 'capture' : 'captures'}'].join(' · '),
-                    style: theme.textTheme.bodySmall,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
+                ),
+                if (clock != null) ...[const SizedBox(width: 8), clock!],
+              ],
             ),
           ),
-          ?clock,
-        ],
+        ),
       ),
     );
   }

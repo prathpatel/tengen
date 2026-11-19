@@ -60,11 +60,19 @@ class Goban extends StatefulWidget {
 @immutable
 class GobanGeometry {
   GobanGeometry(Size size, this.columns, this.rows, {required bool coordinates})
-    : margin = coordinates ? 1.1 : 0.6,
+    : margin = coordinates ? coordinatesMargin : plainMargin,
       cell = math.min(
-        size.width / (columns - 1 + 2 * (coordinates ? 1.1 : 0.6)),
-        size.height / (rows - 1 + 2 * (coordinates ? 1.1 : 0.6)),
+        size.width / (columns - 1 + 2 * (coordinates ? coordinatesMargin : plainMargin)),
+        size.height / (rows - 1 + 2 * (coordinates ? coordinatesMargin : plainMargin)),
       );
+
+  /// Distance from the board edge to the first line, in cells. With coordinates, the labels get
+  /// their own band ([labelCenter]) outside the stones, which reach 0.5 cell beyond the lines.
+  static const coordinatesMargin = 1.35;
+  static const plainMargin = 0.6;
+
+  /// Distance from the board edge to the center of the coordinate labels, in cells.
+  static const labelCenter = 0.42;
 
   final int columns;
   final int rows;
@@ -190,9 +198,16 @@ class _GobanPainter extends CustomPainter {
       (board.height - 1 + 2 * geometry.margin) * cell,
     );
 
-    // Wood.
+    // Shadow, then wood.
+    final boardShape = RRect.fromRectAndRadius(boardRect.deflate(1), Radius.circular(cell * 0.2));
     canvas.drawRRect(
-      RRect.fromRectAndRadius(boardRect, Radius.circular(cell * 0.15)),
+      boardShape.shift(Offset(0, cell * 0.06)),
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.35)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * 0.12),
+    );
+    canvas.drawRRect(
+      boardShape,
       Paint()
         ..shader = LinearGradient(
           begin: Alignment.topLeft,
@@ -316,7 +331,7 @@ class _GobanPainter extends CustomPainter {
     final cell = geometry.cell;
     final style = TextStyle(
       color: theme.lines.withValues(alpha: 0.85),
-      fontSize: cell * 0.42,
+      fontSize: cell * 0.38,
       fontWeight: FontWeight.w600,
     );
     void label(String text, Offset center) {
@@ -327,9 +342,10 @@ class _GobanPainter extends CustomPainter {
       painter.paint(canvas, center - Offset(painter.width / 2, painter.height / 2));
     }
 
-    final offset = geometry.margin * 0.5 * cell;
-    final far = (geometry.margin * 1.5 + board.height - 1) * cell;
-    final right = (geometry.margin * 1.5 + board.width - 1) * cell;
+    const band = GobanGeometry.labelCenter;
+    final offset = band * cell;
+    final far = (2 * geometry.margin - band + board.height - 1) * cell;
+    final right = (2 * geometry.margin - band + board.width - 1) * cell;
     for (var x = 0; x < board.width; x++) {
       final cx = geometry.offsetOf(Point(x, 0)).dx;
       label(prettyColumns[x], Offset(cx, offset));
