@@ -47,6 +47,35 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
     ),
   );
 
+  /// Announces the result, when the game ends and from the info button afterwards.
+  void _showResult() {
+    final provider = offlineGameProvider(setup);
+    final s = ref.read(provider);
+    final result = describeResult(outcome: s.result, winner: null);
+    final bot = setup.botColor;
+    final won = bot != null && s.result != null && !s.result!.startsWith(bot.code);
+    showResultDialog(
+      context,
+      result: GameResultText(
+        result.short,
+        bot == null
+            ? result.description
+            : '${won ? 'You won! ' : 'The computer won. '}${result.description}',
+      ),
+      actions: [
+        (
+          label: 'New game',
+          primary: true,
+          onPressed: () {
+            setState(() => _reviewPly = null);
+            ref.read(provider.notifier).restart();
+          },
+        ),
+        (label: 'Analysis board', primary: false, onPressed: () => _openAnalysis(s)),
+      ],
+    );
+  }
+
   void _showPly(int ply, int moveCount) =>
       setState(() => _reviewPly = ply >= moveCount ? null : ply.clamp(0, moveCount));
 
@@ -60,32 +89,7 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
       if (phase == OfflinePhase.scoring && previous == OfflinePhase.playing) {
         showSnack(context, 'Both passed: tap the dead stones, then Accept.');
       }
-      if (previous != OfflinePhase.finished && phase == OfflinePhase.finished) {
-        final s = ref.read(provider);
-        final result = describeResult(outcome: s.result, winner: null);
-        final bot = setup.botColor;
-        final won = bot != null && s.result != null && !s.result!.startsWith(bot.code);
-        showResultDialog(
-          context,
-          result: GameResultText(
-            result.short,
-            bot == null
-                ? result.description
-                : '${won ? 'You won! ' : 'The computer won. '}${result.description}',
-          ),
-          actions: [
-            (
-              label: 'New game',
-              primary: true,
-              onPressed: () {
-                setState(() => _reviewPly = null);
-                controller.restart();
-              },
-            ),
-            (label: 'Analysis board', primary: false, onPressed: () => _openAnalysis(s)),
-          ],
-        );
-      }
+      if (previous != OfflinePhase.finished && phase == OfflinePhase.finished) _showResult();
     });
 
     final game = state.game;
@@ -243,31 +247,23 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
               primary: true,
               onPressed: controller.acceptScore,
             ),
-          ] else if (finished) ...[
-            GameTextAction(
-              label: 'Analysis',
-              icon: Icons.biotech_outlined,
-              onPressed: () => _openAnalysis(state),
-            ),
-            GameTextAction(
-              label: 'New game',
-              primary: true,
-              onPressed: () {
-                setState(() => _reviewPly = null);
-                controller.restart();
-              },
-            ),
           ] else ...[
-            GameAction(
-              icon: Icons.undo,
-              tooltip: 'Undo',
-              onPressed: live && game.moveCount > 0 && !state.botThinking ? controller.undo : null,
-            ),
-            GameAction(
-              icon: Icons.front_hand_outlined,
-              tooltip: 'Pass',
-              onPressed: live && state.canPlay ? controller.pass : null,
-            ),
+            if (finished)
+              GameAction(icon: Icons.info_outline, tooltip: 'Result', onPressed: _showResult)
+            else ...[
+              GameAction(
+                icon: Icons.undo,
+                tooltip: 'Undo',
+                onPressed: live && game.moveCount > 0 && !state.botThinking
+                    ? controller.undo
+                    : null,
+              ),
+              GameAction(
+                icon: Icons.front_hand_outlined,
+                tooltip: 'Pass',
+                onPressed: live && state.canPlay ? controller.pass : null,
+              ),
+            ],
             GameAction(
               icon: Icons.chevron_left,
               tooltip: 'Previous move',

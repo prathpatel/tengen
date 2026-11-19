@@ -118,6 +118,14 @@ void main() {
     expect(find.text('W+R'), findsWidgets);
     expect(find.text('Black resigned · White is victorious'), findsOneWidget);
     expect(find.text('Analysis board'), findsOneWidget);
+    // Closed, the dialog comes back from the info button of the action bar.
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.byTooltip('Pass'), findsNothing);
+    await tester.tap(find.byTooltip('Result'));
+    await tester.pumpAndSettle();
+    expect(find.text('Black resigned · White is victorious'), findsOneWidget);
     await tester.tap(find.descendant(of: find.byType(Dialog), matching: find.text('New game')));
     await tester.pumpAndSettle();
     expect(find.byType(Dialog), findsNothing);

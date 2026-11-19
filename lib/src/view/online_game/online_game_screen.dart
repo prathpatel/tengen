@@ -50,7 +50,7 @@ class _OnlineGameScreenState extends ConsumerState<OnlineGameScreen> {
     ),
   );
 
-  /// Shows the result when the game ends while it is open.
+  /// Shows the result: when the game ends while it is open, and from the info button.
   void _announceResult() {
     final s = ref.read(onlineGameProvider(gameId)).value;
     if (s == null || !mounted) return;
@@ -189,6 +189,7 @@ class _OnlineGameScreenState extends ConsumerState<OnlineGameScreen> {
           ply: (_reviewPly ?? value.game.moveCount).clamp(0, value.game.moveCount),
           onShowPly: (p) => _showPly(p, value.game.moveCount),
           onOpenAnalysis: () => _openAnalysis(value),
+          onShowResult: _announceResult,
           unreadChat: value.chat.length - (_seenChat ??= value.chat.length),
           onOpenChat: () async {
             await showGameChat(context, gameId);
@@ -218,6 +219,7 @@ class _OnlineGameBody extends ConsumerWidget {
     required this.unreadChat,
     required this.onOpenChat,
     required this.onOpenAnalysis,
+    required this.onShowResult,
   });
 
   final int gameId;
@@ -229,6 +231,9 @@ class _OnlineGameBody extends ConsumerWidget {
   final int unreadChat;
   final VoidCallback onOpenChat;
   final VoidCallback onOpenAnalysis;
+
+  /// Shows the result dialog again, once the game is over.
+  final VoidCallback onShowResult;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -379,6 +384,8 @@ class _OnlineGameBody extends ConsumerWidget {
           badge: unreadChat,
           onPressed: onOpenChat,
         ),
+        if (finished)
+          GameAction(icon: Icons.info_outline, tooltip: 'Result', onPressed: onShowResult),
         if (removal && state.isPlayer && live) ...[
           GameTextAction(
             label: 'Resume',
