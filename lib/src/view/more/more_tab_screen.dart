@@ -120,6 +120,10 @@ class MoreTabScreen extends ConsumerWidget {
                   context: context,
                   applicationName: kAppName,
                   applicationVersion: kAppVersion,
+                  applicationIcon: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.asset('assets/icon/icon.png', width: 56, height: 56),
+                  ),
                   applicationLegalese:
                       'Free software under the GNU GPL v3 or later.\n\n'
                       'Based on the Lichess mobile app (github.com/lichess-org/mobile). Online '
