@@ -29,7 +29,8 @@ This is an unofficial client, not affiliated with OGS or Lichess.
   resigning, undo requests, stone removal and result, live clocks (Fischer, byo-yomi, Canadian,
   simple, absolute) corrected for clock drift.
 - **Puzzles**: the OGS puzzle collections (life and death, tesuji…) with an in-app solver.
-- **Learn**: interactive lessons on the rules, coordinate training, practice against the computer.
+- **Learn**: the full OGS Learning Hub course (248 interactive lessons, 3,551 exercises, content
+  © online-go.com contributors, AGPL-3.0), coordinate training, practice against the computer.
 - **Watch**: top live and correspondence games on OGS, updated in real time.
 - **Chat**: the public OGS chat rooms (English, Help, language rooms…) and the chat of each game,
   for players and spectators.

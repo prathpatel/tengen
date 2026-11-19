@@ -15,6 +15,38 @@ class GobanTerritory {
   final Set<Point> white;
 }
 
+/// A mark drawn on an intersection: a label (letter or number) or a shape.
+@immutable
+sealed class GobanMark {
+  const GobanMark();
+}
+
+class LabelMark extends GobanMark {
+  const LabelMark(this.text);
+
+  final String text;
+
+  @override
+  bool operator ==(Object other) => other is LabelMark && other.text == text;
+
+  @override
+  int get hashCode => text.hashCode;
+}
+
+enum ShapeKind { triangle, square, circle, cross }
+
+class ShapeMark extends GobanMark {
+  const ShapeMark(this.kind);
+
+  final ShapeKind kind;
+
+  @override
+  bool operator ==(Object other) => other is ShapeMark && other.kind == kind;
+
+  @override
+  int get hashCode => kind.hashCode;
+}
+
 /// The part of the board to show, inclusive bounds in board coordinates.
 @immutable
 class GobanViewport {
@@ -91,10 +123,14 @@ class Goban extends StatefulWidget {
     this.deadStones = const {},
     this.territory,
     this.viewport,
+    this.marks = const {},
     super.key,
   });
 
   final Board board;
+
+  /// Labels and shapes drawn on intersections.
+  final Map<Point, GobanMark> marks;
 
   /// The part of the board shown; the whole board when null.
   final GobanViewport? viewport;
@@ -219,6 +255,7 @@ class _GobanState extends State<Goban> {
                 painter: _GobanPainter(
                   board: board,
                   viewport: viewport,
+                  marks: widget.marks,
                   geometry: geometry,
                   theme: widget.theme,
                   showCoordinates: widget.showCoordinates,
@@ -242,6 +279,7 @@ class _GobanPainter extends CustomPainter {
   _GobanPainter({
     required this.board,
     required this.viewport,
+    required this.marks,
     required this.geometry,
     required this.theme,
     required this.showCoordinates,
@@ -255,6 +293,7 @@ class _GobanPainter extends CustomPainter {
 
   final Board board;
   final GobanViewport viewport;
+  final Map<Point, GobanMark> marks;
   final GobanGeometry geometry;
   final BoardTheme theme;
   final bool showCoordinates;
@@ -350,8 +389,12 @@ class _GobanPainter extends CustomPainter {
       }
     }
 
+    for (final MapEntry(key: p, value: mark) in marks.entries) {
+      if (vp.contains(p)) _paintMark(canvas, p, mark);
+    }
+
     final last = lastMove;
-    if (last != null && board[last] != null) {
+    if (last != null && board[last] != null && !marks.containsKey(last)) {
       final stone = board[last]!;
       canvas.drawCircle(
         geometry.offsetOf(last),
@@ -404,6 +447,61 @@ class _GobanPainter extends CustomPainter {
     }
   }
 
+  void _paintMark(Canvas canvas, Point p, GobanMark mark) {
+    final cell = geometry.cell;
+    final center = geometry.offsetOf(p);
+    final stone = board[p];
+    final color = switch (stone) {
+      StoneColor.black => Colors.white,
+      StoneColor.white => Colors.black,
+      null => theme.lines,
+    };
+    switch (mark) {
+      case LabelMark(:final text):
+        if (stone == null) {
+          // Clear the grid lines under the label.
+          canvas.drawCircle(center, cell * 0.36, Paint()..color = theme.wood);
+        }
+        final painter = TextPainter(
+          text: TextSpan(
+            text: text,
+            style: TextStyle(
+              color: color,
+              fontSize: cell * (text.length > 1 ? 0.45 : 0.55),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        painter.paint(canvas, center - Offset(painter.width / 2, painter.height / 2));
+      case ShapeMark(:final kind):
+        final paint = Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(1.5, cell * 0.07);
+        final r = cell * 0.24;
+        switch (kind) {
+          case ShapeKind.triangle:
+            canvas.drawPath(
+              Path()
+                ..moveTo(center.dx, center.dy - r * 1.1)
+                ..lineTo(center.dx + r, center.dy + r * 0.7)
+                ..lineTo(center.dx - r, center.dy + r * 0.7)
+                ..close(),
+              paint,
+            );
+          case ShapeKind.square:
+            canvas.drawRect(Rect.fromCircle(center: center, radius: r * 0.85), paint);
+          case ShapeKind.circle:
+            canvas.drawCircle(center, r, paint);
+          case ShapeKind.cross:
+            canvas
+              ..drawLine(center + Offset(-r, -r), center + Offset(r, r), paint)
+              ..drawLine(center + Offset(r, -r), center + Offset(-r, r), paint);
+        }
+    }
+  }
+
   void _paintCoordinates(Canvas canvas) {
     final cell = geometry.cell;
     final style = TextStyle(
@@ -440,6 +538,7 @@ class _GobanPainter extends CustomPainter {
   bool shouldRepaint(_GobanPainter old) =>
       old.board != board ||
       old.viewport != viewport ||
+      old.marks != marks ||
       old.theme != theme ||
       old.showCoordinates != showCoordinates ||
       old.lastMove != lastMove ||

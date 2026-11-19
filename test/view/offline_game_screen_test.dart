@@ -57,17 +57,22 @@ void main() {
     );
   });
 
-  testWidgets('passing twice shows the counting banner', (tester) async {
+  testWidgets('passing twice goes to counting, shown in the title and the action bar', (
+    tester,
+  ) async {
     await pumpScreen(tester, confirmMoves: false);
+    final boardBefore = tester.getRect(find.byType(Goban));
     await tester.tap(find.byTooltip('Pass'));
     await tester.pump();
-    expect(find.text('Black passed · pass too to end the game and count'), findsOneWidget);
+    expect(find.text('Passed'), findsOneWidget);
     await tester.tap(find.byTooltip('Pass'));
     await tester.pump();
-    expect(find.textContaining('Counting'), findsOneWidget);
-    await tester.tap(find.text('Accept'));
-    await tester.pump();
-    expect(find.text('Game over: W+6.5'), findsOneWidget);
+    expect(find.textContaining('Counting · W+6.5'), findsOneWidget);
+    // Messages never take room from the board.
+    expect(tester.getRect(find.byType(Goban)), boardBefore);
+    await tester.tap(find.widgetWithText(FilledButton, 'Accept'));
+    await tester.pumpAndSettle();
+    expect(find.text('Game over · W+6.5'), findsOneWidget);
   });
 
   testWidgets('the move list and arrows show earlier positions', (tester) async {

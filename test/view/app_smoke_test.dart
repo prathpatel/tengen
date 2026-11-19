@@ -1,7 +1,11 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/app.dart';
+import 'package:tengen/src/model/learn/learning_hub.dart';
 import 'package:tengen/src/view/more/more_tab_screen.dart';
 import 'package:tengen/src/view/settings/settings_screen.dart';
 
@@ -65,6 +69,13 @@ Object? fakeServer(Uri url) {
   return null;
 }
 
+/// The real course, parsed once (the asset loading uses an isolate, which the test clock does not
+/// run).
+final realHub = LearningHub.fromJson(
+  jsonDecode(File('assets/learning_hub/learning_hub.json').readAsStringSync())
+      as Map<String, dynamic>,
+);
+
 void main() {
   const sizes = [Size(320, 640), Size(360, 740), Size(412, 915), Size(800, 1280)];
   for (final size in sizes) {
@@ -74,7 +85,10 @@ void main() {
         (tester) async {
           tester.platformDispatcher.textScaleFactorTestValue = textScale;
           addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-          final (:container, :sockets) = await makeContainer(http: (r) => fakeServer(r.url));
+          final (:container, :sockets) = await makeContainer(
+            http: (r) => fakeServer(r.url),
+            overrides: [learningHubProvider.overrideWith((ref) => realHub)],
+          );
           await tester.binding.setSurfaceSize(size);
           await tester.pumpWidget(
             UncontrolledProviderScope(container: container, child: const TengenApp()),

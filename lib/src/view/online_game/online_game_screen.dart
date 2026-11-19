@@ -99,6 +99,60 @@ class _OnlineGameScreenState extends ConsumerState<OnlineGameScreen> {
       }
     });
 
+    ref.listen(provider.select((s) => s.value?.undoRequestedAt), (_, at) {
+      final s = ref.read(provider).value;
+      if (at != null && s != null && s.isPlayer) {
+        showSnackAction(
+          context,
+          'Your opponent asks to undo their last move',
+          action: 'Accept',
+          onAction: ref.read(provider.notifier).acceptUndo,
+        );
+      }
+    });
+
+    ref.listen(provider.select((s) => s.value?.stallingEstimate), (_, estimate) {
+      final s = ref.read(provider).value;
+      if (estimate == null || s == null) return;
+      final message =
+          'OGS thinks the game is over: ${s.data.player(estimate.winner).username} wins '
+          '(${(estimate.winRate * 100).toStringAsFixed(0)}%).';
+      if (s.isPlayer) {
+        showSnackAction(
+          context,
+          message,
+          action: 'End game',
+          onAction: () => ref.read(provider.notifier).preventStalling(estimate.winner),
+          duration: const Duration(seconds: 30),
+        );
+      } else {
+        showSnack(context, message);
+      }
+    });
+
+    ref.listen(provider.select((s) => s.value?.phase), (previous, phase) {
+      final s = ref.read(provider).value;
+      if (phase == GamePhase.stoneRemoval && previous == GamePhase.play && (s?.isPlayer ?? false)) {
+        showSnack(context, 'Tap the dead groups, then Accept. Both players must agree.');
+      }
+    });
+
+    ref.listen(provider.select((s) => s.value?.game.moveCount), (_, _) {
+      final s = ref.read(provider).value;
+      final last = s?.game.position.lastMove;
+      if (s != null &&
+          s.isPlayer &&
+          s.phase == GamePhase.play &&
+          last != null &&
+          last.isPass &&
+          last.color != s.myColor) {
+        showSnack(
+          context,
+          '${s.data.player(last.color).username} passed. Pass too if nothing useful is left.',
+        );
+      }
+    });
+
     ref.listen(provider.select((s) => s.value?.error), (_, error) {
       if (error != null) {
         showSnack(context, error);
@@ -116,10 +170,7 @@ class _OnlineGameScreenState extends ConsumerState<OnlineGameScreen> {
                 speed[0].toUpperCase() + speed.substring(1),
               if (value.data.timeControl case final tc? when tc.system != 'none') tc.description,
             ].join(' · ').ifEmpty(value.data.name.isEmpty ? 'Game $gameId' : value.data.name),
-            subtitle:
-                '${value.data.width}×${value.data.height} · ${value.data.ruleset.label} · '
-                '${value.data.ranked ? 'Ranked' : 'Unranked'}'
-                '${value.data.handicap > 1 ? ' · ${value.data.handicap} handicap' : ''}',
+            subtitle: _subtitle(value),
           ),
           _ => Text('Game $gameId'),
         },
@@ -213,61 +264,10 @@ class _OnlineGameBody extends ConsumerWidget {
         clock: clock != null && phase == GamePhase.play
             ? OgsClockDisplay(clock: clock, color: color, serverNow: () => socket.serverNow)
             : null,
-      );
-    }
-
-    Widget? banner;
-    if (state.undoRequestedAt != null && state.isPlayer) {
-      banner = GameBanner(
-        title: 'Your opponent asks to undo their last move',
-        actions: [FilledButton(onPressed: controller.acceptUndo, child: const Text('Accept'))],
-      );
-    } else if (live && state.stallingEstimate != null && phase == GamePhase.play) {
-      final estimate = state.stallingEstimate!;
-      banner = GameBanner(
-        title: 'The game looks finished',
-        message:
-            'OGS predicts ${data.player(estimate.winner).username} wins '
-            '(${(estimate.winRate * 100).toStringAsFixed(1)}%). If a player keeps playing '
-            'useless moves instead of passing, the game can end with this result.',
-        actions: [
-          if (state.isPlayer)
-            FilledButton(
-              onPressed: () => controller.preventStalling(estimate.winner),
-              child: const Text('End game with this result'),
-            ),
-        ],
-      );
-    } else if (live && removal) {
-      banner = GameBanner(
-        title: 'Stone removal${score != null ? ': ${score.resultString} (estimate)' : ''}',
-        message: state.isPlayer
-            ? 'Tap the dead groups, then accept. Both players must accept the same stones.'
-            : 'The players are marking the dead stones.',
-        actions: [
-          if (state.isPlayer) ...[
-            FilledButton(onPressed: controller.acceptRemoved, child: const Text('Accept')),
-            OutlinedButton(onPressed: controller.rejectRemoved, child: const Text('Resume game')),
-          ],
-        ],
-      );
-    } else if (live && finished) {
-      final winner = data.winner;
-      final result = describeResult(outcome: data.outcome, winner: winner);
-      banner = GameBanner(
-        title: winner == null
-            ? result.short
-            : '${result.short}  ·  ${data.player(winner).username} wins',
-        message: result.description,
-      );
-    } else if (live && (game.position.lastMove?.isPass ?? false)) {
-      final passer = game.position.lastMove!.color;
-      banner = GameBanner(
-        title: '${data.player(passer).username} passed',
-        message: state.isPlayer && passer != state.myColor
-            ? 'if nothing useful is left, pass too to count'
+        note:
+            live && game.position.lastMove?.isPass == true && game.position.lastMove!.color == color
+            ? 'Passed'
             : null,
-        compact: true,
       );
     }
 
@@ -349,7 +349,6 @@ class _OnlineGameBody extends ConsumerWidget {
       ),
       topPlayer: bar(bottomColor.opposite),
       bottomPlayer: bar(bottomColor),
-      banner: banner,
       board: Goban(
         board: position.board,
         theme: prefs.boardTheme,
@@ -380,6 +379,19 @@ class _OnlineGameBody extends ConsumerWidget {
           badge: unreadChat,
           onPressed: onOpenChat,
         ),
+        if (removal && state.isPlayer && live) ...[
+          GameTextAction(
+            label: 'Resume',
+            icon: Icons.play_arrow_outlined,
+            onPressed: controller.rejectRemoved,
+          ),
+          GameTextAction(
+            label: 'Accept',
+            icon: Icons.check,
+            primary: true,
+            onPressed: controller.acceptRemoved,
+          ),
+        ],
         if (canAct) ...[
           GameAction(
             icon: Icons.front_hand_outlined,
@@ -430,4 +442,24 @@ IconData _speedIcon(String? speed) => switch (speed) {
 
 extension on String {
   String ifEmpty(String fallback) => isEmpty ? fallback : this;
+}
+
+/// The title's second line: the game settings, or the phase when it matters.
+String _subtitle(OnlineGameState s) {
+  final data = s.data;
+  switch (s.phase) {
+    case GamePhase.stoneRemoval:
+      final score = scoreGame(s.game, data.removed);
+      return 'Stone removal · ${score.resultString} (estimate)';
+    case GamePhase.finished:
+      final winner = data.winner;
+      final result = describeResult(outcome: data.outcome, winner: winner);
+      return winner == null
+          ? result.short
+          : '${result.short} · ${data.player(winner).username} wins';
+    case GamePhase.play:
+      return '${data.width}×${data.height} · ${data.ruleset.label} · '
+          '${data.ranked ? 'Ranked' : 'Unranked'}'
+          '${data.handicap > 1 ? ' · ${data.handicap} handicap' : ''}';
+  }
 }

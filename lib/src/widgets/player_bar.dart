@@ -54,12 +54,16 @@ class PlayerBar extends StatelessWidget {
     this.komi,
     this.clock,
     this.thinking = false,
+    this.note,
     this.onTap,
     super.key,
   });
 
   final StoneColor color;
   final String name;
+
+  /// A short status shown after the captures, e.g. `Passed`.
+  final String? note;
 
   /// Rank label, e.g. `3k`.
   final String? rank;
@@ -165,6 +169,25 @@ class PlayerBar extends StatelessWidget {
                             ),
                           ),
                         ),
+                        if (note != null) ...[
+                          const SizedBox(width: 8),
+                          // Same text style as the line, and no vertical padding: the tag
+                          // must not change the row height (it would move the board).
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            decoration: BoxDecoration(
+                              color: scheme.tertiaryContainer,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              note!,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: scheme.onTertiaryContainer,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

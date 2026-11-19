@@ -22,7 +22,17 @@ The OGS client follows the protocol and conventions of the
 [online-go.com web client](https://github.com/online-go/online-go.com) and the
 [goban](https://github.com/online-go/goban) library (AGPL-3.0 and Apache-2.0). No code from those
 projects is included: the Dart implementation here is original, written against their documented
-behavior.
+behavior. The Learning Hub course content is the exception, see below.
 
 "Lichess" and "OGS"/"online-go.com" are the names of their respective projects; Tengen is not
 affiliated with or endorsed by either.
+
+Learning Hub content (AGPL-3.0)
+-------------------------------
+
+`assets/learning_hub/learning_hub.json` is converted from the Learning Hub of the
+[online-go.com web client](https://github.com/online-go/online-go.com) (its interactive "Learn to
+play Go" course), © the online-go.com contributors, licensed under the GNU Affero General Public
+License v3. It is distributed under that license: see `assets/learning_hub/LICENSE-AGPL-3.0.txt`
+and `assets/learning_hub/README.md`. The GNU GPL v3 (the rest of Tengen) and the GNU AGPL v3 allow
+these works to be combined (section 13 of both licenses); the AGPL terms apply to that content.

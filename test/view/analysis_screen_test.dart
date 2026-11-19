@@ -38,11 +38,11 @@ void main() {
     await tester.tapAt(at(const Point(4, 4)));
     await tester.pump();
     expect(shown()[const Point(4, 4)], StoneColor.white);
-    expect(find.text('Exploring a variation'), findsOneWidget);
+    expect(find.text('Variation from move 2'), findsOneWidget);
 
-    await tester.tap(find.text('Back to the game'));
+    await tester.tap(find.byTooltip('Back to the game'));
     await tester.pump();
-    expect(find.text('Exploring a variation'), findsNothing);
+    expect(find.text('Variation from move 2'), findsNothing);
     await tester.tap(find.byTooltip('Next move'));
     await tester.pump();
     expect(shown()[const Point(6, 6)], StoneColor.white);

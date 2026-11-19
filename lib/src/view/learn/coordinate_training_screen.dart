@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/model/go/board.dart';
 import 'package:tengen/src/model/go/coordinates.dart';
-import 'package:tengen/src/model/learn/lessons.dart';
+import 'package:tengen/src/model/learn/coordinate_training.dart';
 import 'package:tengen/src/model/settings/preferences.dart';
 import 'package:tengen/src/widgets/goban.dart';
 import 'package:tengen/src/widgets/segmented_choice.dart';

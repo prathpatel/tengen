@@ -57,6 +57,9 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
     final controller = ref.read(provider.notifier);
     final prefs = ref.watch(preferencesProvider);
     ref.listen(provider.select((s) => s.phase), (previous, phase) {
+      if (phase == OfflinePhase.scoring && previous == OfflinePhase.playing) {
+        showSnack(context, 'Both passed: tap the dead stones, then Accept.');
+      }
       if (previous != OfflinePhase.finished && phase == OfflinePhase.finished) {
         final s = ref.read(provider);
         final result = describeResult(outcome: s.result, winner: null);
@@ -106,36 +109,23 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
       komi: color == StoneColor.white ? game.komi : null,
       active: live && state.phase == OfflinePhase.playing && game.toMove == color,
       thinking: color == setup.botColor && state.botThinking,
+      note: live && game.position.lastMove?.isPass == true && game.position.lastMove!.color == color
+          ? 'Passed'
+          : null,
     );
 
-    // No banner while looking at an earlier position.
-    Widget? banner;
-    if (live && scoring && score != null) {
-      banner = GameBanner(
-        title: 'Counting: ${score.resultString}',
-        message:
-            'Tap the dead stones to remove them. Black ${score.black.total} · '
-            'White ${score.white.total}',
-        actions: [
-          FilledButton(onPressed: controller.acceptScore, child: const Text('Accept')),
-          OutlinedButton(onPressed: controller.resumePlay, child: const Text('Resume play')),
-        ],
-      );
-    } else if (live && finished) {
-      banner = GameBanner(
-        title: 'Game over: ${state.result}',
-        message: score == null
-            ? null
-            : 'Black ${score.black.total} · White ${score.white.total} '
-                  '(${game.ruleset.areaScoring ? 'area' : 'territory'} scoring)',
-        actions: [FilledButton(onPressed: controller.restart, child: const Text('New game'))],
-      );
-    } else if (live && (game.position.lastMove?.isPass ?? false)) {
-      banner = GameBanner(
-        title: '${_name(game.position.lastMove!.color)} passed',
-        message: 'pass too to end the game and count',
-        compact: true,
-      );
+    // The phase is told in the title, not in a banner, so that the board keeps its size.
+    final String subtitle;
+    if (scoring && score != null) {
+      subtitle =
+          'Counting · ${score.resultString} '
+          '(B ${_points(score.black.total)} · W ${_points(score.white.total)})';
+    } else if (finished) {
+      subtitle = 'Game over · ${state.result}';
+    } else {
+      subtitle =
+          '${setup.size}×${setup.size} · ${setup.ruleset.label}'
+          '${setup.handicap > 1 ? ' · ${setup.handicap} handicap' : ''}';
     }
 
     void copySgf() {
@@ -210,9 +200,7 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
         title: GameTitle(
           icon: setup.botColor != null ? Icons.smart_toy_outlined : Icons.people_outline,
           title: setup.botColor != null ? 'vs Computer' : 'Pass and play',
-          subtitle:
-              '${setup.size}×${setup.size} · ${setup.ruleset.label}'
-              '${setup.handicap > 1 ? ' · ${setup.handicap} handicap' : ''}',
+          subtitle: subtitle,
         ),
       ),
       body: GameLayout(
@@ -224,7 +212,6 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
         ),
         topPlayer: bar(bottomColor.opposite),
         bottomPlayer: bar(bottomColor),
-        banner: banner,
         board: Goban(
           board: position.board,
           theme: prefs.boardTheme,
@@ -244,30 +231,60 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
         ),
         actions: [
           GameAction(icon: Icons.menu, tooltip: 'Menu', onPressed: showMenu),
-          GameAction(
-            icon: Icons.undo,
-            tooltip: 'Undo',
-            onPressed: live && game.moveCount > 0 && !state.botThinking ? controller.undo : null,
-          ),
-          GameAction(
-            icon: Icons.front_hand_outlined,
-            tooltip: 'Pass',
-            onPressed: live && state.canPlay ? controller.pass : null,
-          ),
-          GameAction(
-            icon: Icons.chevron_left,
-            tooltip: 'Previous move',
-            large: true,
-            onPressed: ply > 0 ? () => _showPly(ply - 1, game.moveCount) : null,
-          ),
-          GameAction(
-            icon: Icons.chevron_right,
-            tooltip: 'Next move',
-            large: true,
-            onPressed: live ? null : () => _showPly(ply + 1, game.moveCount),
-          ),
+          if (scoring) ...[
+            GameTextAction(
+              label: 'Resume',
+              icon: Icons.play_arrow_outlined,
+              onPressed: controller.resumePlay,
+            ),
+            GameTextAction(
+              label: 'Accept',
+              icon: Icons.check,
+              primary: true,
+              onPressed: controller.acceptScore,
+            ),
+          ] else if (finished) ...[
+            GameTextAction(
+              label: 'Analysis',
+              icon: Icons.biotech_outlined,
+              onPressed: () => _openAnalysis(state),
+            ),
+            GameTextAction(
+              label: 'New game',
+              primary: true,
+              onPressed: () {
+                setState(() => _reviewPly = null);
+                controller.restart();
+              },
+            ),
+          ] else ...[
+            GameAction(
+              icon: Icons.undo,
+              tooltip: 'Undo',
+              onPressed: live && game.moveCount > 0 && !state.botThinking ? controller.undo : null,
+            ),
+            GameAction(
+              icon: Icons.front_hand_outlined,
+              tooltip: 'Pass',
+              onPressed: live && state.canPlay ? controller.pass : null,
+            ),
+            GameAction(
+              icon: Icons.chevron_left,
+              tooltip: 'Previous move',
+              large: true,
+              onPressed: ply > 0 ? () => _showPly(ply - 1, game.moveCount) : null,
+            ),
+            GameAction(
+              icon: Icons.chevron_right,
+              tooltip: 'Next move',
+              large: true,
+              onPressed: live ? null : () => _showPly(ply + 1, game.moveCount),
+            ),
+          ],
         ],
       ),
     );
   }
 }
+
+String _points(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toString();

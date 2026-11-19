@@ -65,7 +65,6 @@ class GameLayout extends StatelessWidget {
     required this.bottomPlayer,
     required this.actions,
     this.moveList,
-    this.banner,
     super.key,
   });
 
@@ -75,9 +74,6 @@ class GameLayout extends StatelessWidget {
   final Widget topPlayer;
   final Widget bottomPlayer;
   final List<Widget> actions;
-
-  /// A message shown under the bottom player (result, counting, undo request).
-  final Widget? banner;
 
   @override
   Widget build(BuildContext context) {
@@ -115,7 +111,7 @@ class GameLayout extends StatelessWidget {
                       Expanded(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: [topPlayer, ?banner, bottomPlayer],
+                          children: [topPlayer, bottomPlayer],
                         ),
                       ),
                       actionBar,
@@ -130,19 +126,15 @@ class GameLayout extends StatelessWidget {
           children: [
             ?moveList,
             Expanded(
-              // The board takes the full width; a banner uses the space left below the players
-              // and only shrinks the board when there is not enough (see _GameAreaLayout).
+              // The board takes all the room the players leave (see _GameAreaLayout). Messages
+              // never take space from it: they go in the title, the player rows, the action bar
+              // or a snack bar.
               child: CustomMultiChildLayout(
                 delegate: _GameAreaLayout(),
                 children: [
                   LayoutId(id: _GameAreaLayout.top, child: topPlayer),
                   LayoutId(id: _GameAreaLayout.board, child: board),
                   LayoutId(id: _GameAreaLayout.bottom, child: bottomPlayer),
-                  if (banner != null)
-                    LayoutId(
-                      id: _GameAreaLayout.banner,
-                      child: SingleChildScrollView(child: banner),
-                    ),
                 ],
               ),
             ),
@@ -188,81 +180,51 @@ class GameAction extends StatelessWidget {
   }
 }
 
-/// A highlighted message shown under the board. [compact] banners are a single line, for
-/// messages shown during play.
-class GameBanner extends StatelessWidget {
-  const GameBanner({
-    required this.title,
-    this.message,
-    this.actions = const [],
-    this.compact = false,
+/// A labelled button of the game action bar, for phase actions (accept the score, new game).
+class GameTextAction extends StatelessWidget {
+  const GameTextAction({
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.primary = false,
     super.key,
   });
 
-  final String title;
-  final String? message;
-  final List<Widget> actions;
-  final bool compact;
+  final String label;
+  final IconData? icon;
+  final VoidCallback? onPressed;
+  final bool primary;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final fg = theme.colorScheme.onSecondaryContainer;
-    if (compact) {
-      return Container(
-        width: double.infinity,
-        margin: const EdgeInsets.symmetric(horizontal: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.secondaryContainer,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          message == null ? title : '$title · $message',
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodyMedium?.copyWith(color: fg, fontWeight: FontWeight.w600),
-        ),
-      );
-    }
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final child = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            title,
-            style: theme.textTheme.titleMedium?.copyWith(color: fg, fontWeight: FontWeight.w600),
-          ),
-          if (message != null)
-            Text(message!, style: theme.textTheme.bodyMedium?.copyWith(color: fg)),
-          if (actions.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Wrap(spacing: 8, runSpacing: 4, children: actions),
-            ),
+          if (icon != null) ...[Icon(icon, size: 20), const SizedBox(width: 6)],
+          Text(label, maxLines: 1),
         ],
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      child: SizedBox(
+        height: 44,
+        child: primary
+            ? FilledButton(onPressed: onPressed, child: child)
+            : FilledButton.tonal(onPressed: onPressed, child: child),
       ),
     );
   }
 }
 
-/// Lays out the players, the board and an optional banner, top to bottom.
-///
-/// The board is as large as the width allows. A banner goes in the space left below the bottom
-/// player, so showing one does not move or resize the board, unless the screen is too short for
-/// it: then the board shrinks just enough.
+/// Lays out the players and the board, top to bottom: the board is as large as the room the
+/// players leave allows.
 class _GameAreaLayout extends MultiChildLayoutDelegate {
   static const top = 'top';
   static const board = 'board';
   static const bottom = 'bottom';
-  static const banner = 'banner';
 
   static const gap = 6.0;
 
@@ -271,24 +233,8 @@ class _GameAreaLayout extends MultiChildLayoutDelegate {
     final wide = BoxConstraints(minWidth: size.width, maxWidth: size.width, maxHeight: size.height);
     final topHeight = layoutChild(top, wide).height;
     final bottomHeight = layoutChild(bottom, wide).height;
-    final bannerHeight = hasChild(banner)
-        ? layoutChild(
-            banner,
-            BoxConstraints(
-              minWidth: size.width,
-              maxWidth: size.width,
-              maxHeight: size.height * 0.4,
-            ),
-          ).height
-        : 0.0;
-
-    // The board's room: everything the players leave, minus the banner only when the banner
-    // does not fit in the space the board leaves free.
-    final room = (size.height - gap * 3 - topHeight - bottomHeight).clamp(0.0, size.height);
-    final boardMax = room - size.width >= bannerHeight
-        ? room
-        : (room - bannerHeight).clamp(0.0, room);
-    final boardSize = layoutChild(board, BoxConstraints(maxWidth: size.width, maxHeight: boardMax));
+    final room = (size.height - gap * 2 - topHeight - bottomHeight).clamp(0.0, size.height);
+    final boardSize = layoutChild(board, BoxConstraints(maxWidth: size.width, maxHeight: room));
 
     var y = gap;
     positionChild(top, Offset(0, y));
@@ -296,8 +242,6 @@ class _GameAreaLayout extends MultiChildLayoutDelegate {
     positionChild(board, Offset((size.width - boardSize.width) / 2, y));
     y += boardSize.height;
     positionChild(bottom, Offset(0, y));
-    y += bottomHeight + gap;
-    if (hasChild(banner)) positionChild(banner, Offset(0, y));
   }
 
   @override

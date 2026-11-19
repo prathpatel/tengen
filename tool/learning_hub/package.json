@@ -1,0 +1,9 @@
+{
+  "name": "tengen-learning-hub-converter",
+  "private": true,
+  "type": "module",
+  "description": "Converts the OGS Learning Hub (online-go.com, AGPL-3.0) to the JSON asset used by Tengen.",
+  "devDependencies": {
+    "esbuild": "0.25.0"
+  }
+}

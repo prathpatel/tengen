@@ -6,6 +6,7 @@ import 'package:tengen/src/model/go/board.dart';
 import 'package:tengen/src/model/go/coordinates.dart';
 import 'package:tengen/src/model/go/game.dart';
 import 'package:tengen/src/model/ogs/user.dart';
+import 'package:tengen/src/model/puzzle/tree_solver.dart';
 import 'package:tengen/src/model/settings/preferences.dart';
 import 'package:tengen/src/network/http.dart';
 import 'package:tengen/src/utils/json.dart';
@@ -342,46 +343,30 @@ class PuzzleController extends AsyncNotifier<PuzzleState> {
   IllegalMoveException? play(Point p) {
     final s = state.value;
     if (s == null || !s.canPlay) return const IllegalMoveException(IllegalMoveReason.wrongTurn);
-    final GoGame game;
+    final TreeSolver next;
     try {
-      game = s.game.play(p);
+      next = TreeSolver(game: s.game, node: s.node).play(p);
     } on IllegalMoveException catch (e) {
       return e;
     }
-    final branch = s.node.branchAt(p);
-    if (branch == null) {
-      state = AsyncData(s.copyWith(game: game, status: PuzzleStatus.wrong));
-      return null;
+    final replying = next.status == PuzzleStatus.solving;
+    state = AsyncData(
+      s.copyWith(game: next.game, node: next.node, status: next.status, opponentThinking: replying),
+    );
+    if (replying) {
+      _replyTimer?.cancel();
+      _replyTimer = Timer(ref.read(puzzleReplyDelayProvider), _reply);
     }
-    if (branch.correct) {
-      state = AsyncData(s.copyWith(game: game, node: branch, status: PuzzleStatus.correct));
-      return null;
-    }
-    if (branch.wrong || branch.branches.isEmpty) {
-      state = AsyncData(s.copyWith(game: game, node: branch, status: PuzzleStatus.wrong));
-      return null;
-    }
-    state = AsyncData(s.copyWith(game: game, node: branch, opponentThinking: true));
-    _replyTimer?.cancel();
-    _replyTimer = Timer(ref.read(puzzleReplyDelayProvider), _reply);
     return null;
   }
 
   void _reply() {
     final s = state.value;
     if (s == null) return;
-    final reply = s.node.branches.first;
-    final GoGame game;
-    try {
-      game = s.game.playMove(GoMove(s.game.toMove, reply.point), validate: false);
-    } on Object {
-      state = AsyncData(s.copyWith(opponentThinking: false, status: PuzzleStatus.wrong));
-      return;
-    }
-    final status = reply.correct
-        ? PuzzleStatus.correct
-        : (reply.wrong || reply.branches.isEmpty ? PuzzleStatus.wrong : PuzzleStatus.solving);
-    state = AsyncData(s.copyWith(game: game, node: reply, status: status, opponentThinking: false));
+    final next = TreeSolver(game: s.game, node: s.node).reply();
+    state = AsyncData(
+      s.copyWith(game: next.game, node: next.node, status: next.status, opponentThinking: false),
+    );
   }
 
   /// Starts the puzzle again.
@@ -391,15 +376,10 @@ class PuzzleController extends AsyncNotifier<PuzzleState> {
     if (s != null) state = AsyncData(_initial(s.puzzle));
   }
 
-  /// The correct first moves, used as a hint.
+  /// The correct moves from here, used as a hint.
   Set<Point> hint() {
     final s = state.value;
-    if (s == null) return const {};
-    bool leadsToCorrect(PuzzleNode n) => n.correct || n.branches.any(leadsToCorrect);
-    return {
-      for (final b in s.node.branches)
-        if (b.point != null && leadsToCorrect(b)) b.point!,
-    };
+    return s == null ? const {} : TreeSolver(game: s.game, node: s.node).hint();
   }
 }
 

@@ -127,7 +127,9 @@ class MoreTabScreen extends ConsumerWidget {
                   applicationLegalese:
                       'Free software under the GNU GPL v3 or later.\n\n'
                       'Based on the Lichess mobile app (github.com/lichess-org/mobile). Online '
-                      'play uses the online-go.com APIs; this app is not affiliated with OGS.',
+                      'play uses the online-go.com APIs; this app is not affiliated with OGS.\n\n'
+                      'The Learn course is the online-go.com Learning Hub, © the OGS '
+                      'contributors, under the GNU AGPL v3.',
                 ),
               ),
             ],

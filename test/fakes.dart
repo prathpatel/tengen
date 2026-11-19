@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -92,6 +93,7 @@ Future<({ProviderContainer container, List<FakeWebSocketChannel> sockets})> make
   Object? Function(http.Request request)? http,
   Map<String, Object> prefs = const {},
   Map<String, String> secureStorage = const {},
+  List<Override> overrides = const [],
 }) async {
   SharedPreferences.setMockInitialValues(prefs);
   FlutterSecureStorage.setMockInitialValues(Map.of(secureStorage));
@@ -99,6 +101,7 @@ Future<({ProviderContainer container, List<FakeWebSocketChannel> sockets})> make
   final sockets = <FakeWebSocketChannel>[];
   final container = ProviderContainer(
     overrides: [
+      ...overrides,
       sharedPreferencesProvider.overrideWithValue(sharedPrefs),
       httpClientProvider.overrideWithValue(
         fakeOgsHttp(http ?? (r) => r.url.path == '/api/v1/ui/config' ? guestConfig : null),

@@ -34,3 +34,23 @@ void showSnack(BuildContext context, String message) {
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(message), duration: const Duration(seconds: 2)));
 }
+
+/// A snack bar with an action, for prompts that must not take space from the board.
+void showSnackAction(
+  BuildContext context,
+  String message, {
+  required String action,
+  required VoidCallback onAction,
+  Duration duration = const Duration(seconds: 15),
+}) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: duration,
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(label: action, onPressed: onAction),
+      ),
+    );
+}

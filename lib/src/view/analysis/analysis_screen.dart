@@ -120,8 +120,11 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
         title: GameTitle(
           icon: Icons.biotech_outlined,
           title: widget.title,
-          subtitle: variation
-              ? 'Variation from move $_branchPly'
+          subtitle: score != null
+              ? 'Count · ${score.resultString} '
+                    '(B ${score.black.total} · W ${score.white.total}) · tap dead stones'
+              : variation
+              ? 'Variation from move ${_branchPly + 1}'
               : '${game.width}×${game.height} · ${game.ruleset.label}',
         ),
       ),
@@ -134,22 +137,6 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
         ),
         topPlayer: bar(StoneColor.white),
         bottomPlayer: bar(StoneColor.black),
-        banner: score != null
-            ? GameBanner(
-                title: 'Count: ${score.resultString}',
-                message:
-                    'Black ${score.black.total} · White ${score.white.total}. Tap groups to mark '
-                    'them dead. Only correct when the borders are finished.',
-              )
-            : variation
-            ? GameBanner(
-                title: 'Exploring a variation',
-                message: 'The game continued differently from move ${_branchPly + 1}.',
-                actions: [
-                  OutlinedButton(onPressed: _backToGame, child: const Text('Back to the game')),
-                ],
-              )
-            : null,
         board: Goban(
           board: position.board,
           theme: prefs.boardTheme,
@@ -217,6 +204,12 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
               ),
             ),
           ),
+          if (variation)
+            GameAction(
+              icon: Icons.settings_backup_restore,
+              tooltip: 'Back to the game',
+              onPressed: _backToGame,
+            ),
           GameAction(
             icon: _counting ? Icons.calculate : Icons.calculate_outlined,
             tooltip: _counting ? 'Stop counting' : 'Count territory',
