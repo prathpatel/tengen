@@ -265,8 +265,9 @@ class _OnlineGameBody extends ConsumerWidget {
       banner = GameBanner(
         title: '${data.player(passer).username} passed',
         message: state.isPlayer && passer != state.myColor
-            ? 'If nothing useful is left to play, pass too: the game then goes to counting.'
+            ? 'if nothing useful is left, pass too to count'
             : null,
+        compact: true,
       );
     }
 

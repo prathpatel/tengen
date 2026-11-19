@@ -61,7 +61,7 @@ void main() {
     await pumpScreen(tester, confirmMoves: false);
     await tester.tap(find.byTooltip('Pass'));
     await tester.pump();
-    expect(find.text('Black passed'), findsOneWidget);
+    expect(find.text('Black passed · pass too to end the game and count'), findsOneWidget);
     await tester.tap(find.byTooltip('Pass'));
     await tester.pump();
     expect(find.textContaining('Counting'), findsOneWidget);

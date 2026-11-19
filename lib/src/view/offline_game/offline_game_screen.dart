@@ -133,7 +133,8 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
     } else if (live && (game.position.lastMove?.isPass ?? false)) {
       banner = GameBanner(
         title: '${_name(game.position.lastMove!.color)} passed',
-        message: 'Pass too to end the game and count.',
+        message: 'pass too to end the game and count',
+        compact: true,
       );
     }
 
