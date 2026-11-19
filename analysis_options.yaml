@@ -17,10 +17,6 @@ analyzer:
   exclude:
     - "**/*.g.dart"
     - "**/*.freezed.dart"
-    - lib/src/styles/lichess_icons.dart
-    - lib/src/styles/social_icons.dart
-    - lib/firebase_options.dart
-    - lib/l10n/*.dart
     - build/
     - build/**
     - android/**
@@ -46,3 +42,7 @@ linter:
     avoid_redundant_argument_values: false
     sort_pub_dependencies: true
     sort_unnamed_constructors_first: false
+    # Conventional constructors are kept over Dart 3.14 primary constructors.
+    use_primary_constructors: false
+    unnecessary_type_name_in_constructor: false
+    unnecessary_const_in_enum_constructor: false

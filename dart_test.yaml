@@ -1,0 +1,4 @@
+tags:
+  live:
+    skip: "Talks to the real online-go.com servers. Run with: flutter test -t live --run-skipped"
+    timeout: 3x
