@@ -55,7 +55,7 @@ void main() {
     addTearDown(sub.close);
     await pumpEventQueue();
     final socket = sockets.single;
-    expect(socket.sentCommands('game/connect').single[1], {'game_id': 7, 'chat': false});
+    expect(socket.sentCommands('game/connect').single[1], {'game_id': 7, 'chat': true});
     socket.serverSend(
       'game/7/gamedata',
       gamedata(
@@ -162,5 +162,50 @@ void main() {
     await pumpEventQueue();
     expect(sockets.single.sentCommands('game/disconnect').single[1], {'game_id': 7});
     container.dispose();
+  });
+
+  test('collects the players and spectators chat, and sends messages', () async {
+    final (:socket, :controller, :read) = await setUpGame(userId: 99);
+    Map<String, Object?> line(String channel, String id, Object body) => {
+      'channel': channel,
+      'line': {
+        'chat_id': id,
+        'date': 1700000000,
+        'move_number': 1,
+        'player_id': 42,
+        'username': 'alice',
+        'body': body,
+      },
+    };
+    socket
+      ..serverSend('game/7/chat', line('main', 'a', 'Have a good game'))
+      ..serverSend('game/7/chat', line('spectator', 'b', {'en': 'Nice move', 'fr': 'Joli'}))
+      ..serverSend('game/7/chat', line('malkovich', 'c', 'hidden comment'))
+      ..serverSend('game/7/chat', line('main', 'a', 'Have a good game'));
+    await pumpEventQueue();
+    var chat = (await read()).chat;
+    expect(chat.map((l) => l.text), ['Have a good game', 'Nice move']);
+    expect(chat.last.isSpectator, isTrue);
+    expect(chat.first.date, DateTime.fromMillisecondsSinceEpoch(1700000000 * 1000));
+
+    controller.sendChat('  thanks!  ');
+    expect(socket.sentCommands('game/chat').single[1], {
+      'game_id': 7,
+      'type': 'main',
+      'move_number': 1,
+      'body': 'thanks!',
+    });
+
+    socket.serverSend('game/7/chat/remove', {
+      'game_id': 7,
+      'chat_ids': ['a'],
+    });
+    await pumpEventQueue();
+    chat = (await read()).chat;
+    expect(chat.map((l) => l.id), ['b']);
+
+    socket.serverSend('game/7/reset-chats', null);
+    await pumpEventQueue();
+    expect((await read()).chat, isEmpty);
   });
 }

@@ -18,27 +18,37 @@ String moveSummary(GoGame game) {
   return 'Move ${game.moveCount} · $what';
 }
 
-/// An app bar title with a smaller line below, e.g. the move number.
+/// An app bar title with a smaller line below, and an optional icon (as in the lichess app).
 class GameTitle extends StatelessWidget {
-  const GameTitle({required this.title, this.subtitle, super.key});
+  const GameTitle({required this.title, this.subtitle, this.icon, super.key});
 
   final String title;
   final String? subtitle;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
+    return Row(
       children: [
-        Text(title, overflow: TextOverflow.ellipsis),
-        if (subtitle != null)
-          Text(
-            subtitle!,
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            overflow: TextOverflow.ellipsis,
+        if (icon != null) ...[Icon(icon, size: 28), const SizedBox(width: 12)],
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(title, overflow: TextOverflow.ellipsis),
+              if (subtitle != null)
+                Text(
+                  subtitle!,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+            ],
           ),
+        ),
       ],
     );
   }
@@ -54,10 +64,13 @@ class GameLayout extends StatelessWidget {
     required this.topPlayer,
     required this.bottomPlayer,
     required this.actions,
+    this.moveList,
     this.banner,
     super.key,
   });
 
+  /// The move list strip, shown at the top.
+  final Widget? moveList;
   final Widget board;
   final Widget topPlayer;
   final Widget bottomPlayer;
@@ -71,8 +84,7 @@ class GameLayout extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final actionBar = DecoratedBox(
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        border: Border(top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5))),
+        border: Border(top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.3))),
       ),
       child: SafeArea(
         top: false,
@@ -85,10 +97,7 @@ class GameLayout extends StatelessWidget {
         ),
       ),
     );
-    final paddedBoard = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      child: board,
-    );
+    final paddedBoard = Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: board);
     return LayoutBuilder(
       builder: (context, constraints) {
         final landscape = constraints.maxWidth > constraints.maxHeight * 1.2;
@@ -102,6 +111,7 @@ class GameLayout extends StatelessWidget {
                   flex: 2,
                   child: Column(
                     children: [
+                      ?moveList,
                       Expanded(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -118,6 +128,7 @@ class GameLayout extends StatelessWidget {
         }
         return Column(
           children: [
+            ?moveList,
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -137,30 +148,38 @@ class GameLayout extends StatelessWidget {
   }
 }
 
-/// An icon button with a label below, used in the game action bar.
+/// An icon button of the game action bar, with an optional badge (unread chat messages).
 class GameAction extends StatelessWidget {
-  const GameAction({required this.icon, required this.label, this.onPressed, super.key});
+  const GameAction({
+    required this.icon,
+    required this.tooltip,
+    this.onPressed,
+    this.badge,
+    this.large = false,
+    super.key,
+  });
 
   final IconData icon;
-  final String label;
+  final String tooltip;
   final VoidCallback? onPressed;
+  final int? badge;
+
+  /// Larger icon, for the move navigation arrows.
+  final bool large;
 
   @override
-  Widget build(BuildContext context) => TextButton(
-    onPressed: onPressed,
-    style: TextButton.styleFrom(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon),
-        const SizedBox(height: 2),
-        Text(label, overflow: TextOverflow.ellipsis),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) {
+    final count = badge;
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      iconSize: large ? 34 : 28,
+      padding: const EdgeInsets.all(10),
+      icon: count != null && count > 0
+          ? Badge(label: Text(count > 99 ? '99+' : '$count'), child: Icon(icon))
+          : Icon(icon),
+    );
+  }
 }
 
 /// A highlighted message shown under the board.

@@ -6,6 +6,7 @@ import 'package:tengen/src/model/auth/auth_controller.dart';
 import 'package:tengen/src/model/go/board.dart';
 import 'package:tengen/src/model/go/coordinates.dart';
 import 'package:tengen/src/model/go/game.dart';
+import 'package:tengen/src/model/ogs/chat.dart';
 import 'package:tengen/src/model/ogs/clock.dart';
 import 'package:tengen/src/model/ogs/game_data.dart';
 import 'package:tengen/src/model/ogs/ogs_socket_provider.dart';
@@ -21,6 +22,7 @@ class OnlineGameState {
     this.pendingMove,
     this.undoRequestedAt,
     this.error,
+    this.chat = const [],
   });
 
   final OgsGameData data;
@@ -38,6 +40,9 @@ class OnlineGameState {
   /// The last error message from the server.
   final String? error;
 
+  /// The game chat (players and spectators), oldest first.
+  final List<GameChatLine> chat;
+
   bool get isPlayer => myColor != null;
   GamePhase get phase => data.phase;
   bool get isMyTurn =>
@@ -49,6 +54,7 @@ class OnlineGameState {
     Point? Function()? pendingMove,
     int? Function()? undoRequestedAt,
     String? Function()? error,
+    List<GameChatLine>? chat,
   }) => OnlineGameState(
     data: data ?? this.data,
     game: game ?? this.game,
@@ -56,6 +62,7 @@ class OnlineGameState {
     pendingMove: pendingMove != null ? pendingMove() : this.pendingMove,
     undoRequestedAt: undoRequestedAt != null ? undoRequestedAt() : this.undoRequestedAt,
     error: error != null ? error() : this.error,
+    chat: chat ?? this.chat,
   );
 }
 
@@ -82,18 +89,22 @@ class OnlineGameController extends AsyncNotifier<OnlineGameState> {
     final socket = ref.watch(ogsSocketProvider);
     final prefix = 'game/$gameId/';
     final first = Completer<OnlineGameState>();
+    // Chat lines can arrive before the game data.
+    var earlyChat = <GameChatLine>[];
 
     final subscriptions = [
       socket.events.where((e) => e.name.startsWith(prefix)).listen((event) {
         final name = event.name.substring(prefix.length);
         if (name == 'gamedata') {
           final data = OgsGameData.fromJson(asMap(event.data) ?? const {});
-          final next = _fromData(data);
           if (!first.isCompleted) {
-            first.complete(next);
+            first.complete(_fromData(data, earlyChat));
           } else {
-            state = AsyncData(next);
+            state = AsyncData(_fromData(data, state.value?.chat ?? const []));
           }
+        } else if (!first.isCompleted) {
+          if (name == 'reset-chats') earlyChat = [];
+          if (name == 'chat') earlyChat = _addChat(earlyChat, event.data);
         } else if (state.value case final current?) {
           final next = _apply(current, name, event.data);
           if (next != null) state = AsyncData(next);
@@ -112,10 +123,20 @@ class OnlineGameController extends AsyncNotifier<OnlineGameState> {
     return await first.future;
   }
 
-  void _connect() => _socket.send('game/connect', {'game_id': gameId, 'chat': false});
+  void _connect() => _socket.send('game/connect', {'game_id': gameId, 'chat': true});
 
-  OnlineGameState _fromData(OgsGameData data) {
-    return OnlineGameState(data: data, game: data.buildGame(), myColor: data.colorOf(_userId));
+  OnlineGameState _fromData(OgsGameData data, List<GameChatLine> chat) => OnlineGameState(
+    data: data,
+    game: data.buildGame(),
+    myColor: data.colorOf(_userId),
+    chat: chat,
+  );
+
+  static List<GameChatLine> _addChat(List<GameChatLine> chat, Object? event) {
+    final line = GameChatLine.fromEvent(event);
+    if (line == null || !visibleChatChannels.contains(line.channel)) return chat;
+    if (chat.any((l) => l.id == line.id)) return chat;
+    return List.unmodifiable([...chat, line]);
   }
 
   /// Applies an event to the current state. Returns null when nothing changed.
@@ -167,6 +188,14 @@ class OnlineGameController extends AsyncNotifier<OnlineGameState> {
         // The server sends no new game data: resynchronise.
         _connect();
         return s.copyWith(undoRequestedAt: () => null);
+      case 'chat':
+        final chat = _addChat(s.chat, payload);
+        return identical(chat, s.chat) ? null : s.copyWith(chat: chat);
+      case 'reset-chats':
+        return s.copyWith(chat: const []);
+      case 'chat/remove':
+        final ids = asList(asMap(payload)?['chat_ids']).whereType<String>().toSet();
+        return s.copyWith(chat: s.chat.where((l) => !ids.contains(l.id)).toList());
       case 'error':
         return s.copyWith(error: () => payload?.toString() ?? 'Error', pendingMove: () => null);
       default:
@@ -238,4 +267,17 @@ class OnlineGameController extends AsyncNotifier<OnlineGameState> {
   void rejectRemoved() => _socket.send('game/removed_stones/reject', {'game_id': gameId});
 
   void clearError() => _update((s) => s.copyWith(error: () => null));
+
+  /// Sends a chat message. OGS shows it to the players, or to the spectators when sent by one.
+  void sendChat(String text) {
+    final s = state.value;
+    final body = text.trim();
+    if (s == null || body.isEmpty) return;
+    _socket.send('game/chat', {
+      'game_id': gameId,
+      'type': 'main',
+      'move_number': s.game.moveCount,
+      'body': body,
+    });
+  }
 }

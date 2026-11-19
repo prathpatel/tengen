@@ -59,14 +59,45 @@ void main() {
 
   testWidgets('passing twice shows the counting banner', (tester) async {
     await pumpScreen(tester, confirmMoves: false);
-    await tester.tap(find.text('Pass'));
+    await tester.tap(find.byTooltip('Pass'));
     await tester.pump();
     expect(find.text('Black passed'), findsOneWidget);
-    await tester.tap(find.text('Pass'));
+    await tester.tap(find.byTooltip('Pass'));
     await tester.pump();
     expect(find.textContaining('Counting'), findsOneWidget);
     await tester.tap(find.text('Accept'));
     await tester.pump();
     expect(find.text('Game over: W+6.5'), findsOneWidget);
+  });
+
+  testWidgets('the move list and arrows show earlier positions', (tester) async {
+    final container = await pumpScreen(tester, confirmMoves: false);
+    await tester.tapAt(pointOffset(tester, const Point(2, 2)));
+    await tester.pump();
+    await tester.tapAt(pointOffset(tester, const Point(6, 6)));
+    await tester.pump();
+    // The move list shows both moves with their coordinates.
+    expect(find.text('C7'), findsOneWidget);
+    expect(find.text('G3'), findsOneWidget);
+
+    Board shownBoard() => tester.widget<Goban>(find.byType(Goban)).board;
+
+    await tester.tap(find.byTooltip('Previous move'));
+    await tester.pump();
+    expect(shownBoard()[const Point(6, 6)], isNull);
+
+    // Moves cannot be played while looking at an earlier position.
+    await tester.tapAt(pointOffset(tester, const Point(4, 4)));
+    await tester.pump();
+    expect(container.read(offlineGameProvider(setup)).game.moveCount, 2);
+
+    // Tapping a move in the list jumps to it; the last one returns to the game.
+    await tester.tap(find.text('G3'));
+    await tester.pump();
+    expect(shownBoard()[const Point(6, 6)], StoneColor.white);
+    // Back on the last move, moves can be played again.
+    await tester.tapAt(pointOffset(tester, const Point(4, 4)));
+    await tester.pump();
+    expect(container.read(offlineGameProvider(setup)).game.moveCount, 3);
   });
 }

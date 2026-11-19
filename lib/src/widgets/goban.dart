@@ -198,16 +198,9 @@ class _GobanPainter extends CustomPainter {
       (board.height - 1 + 2 * geometry.margin) * cell,
     );
 
-    // Shadow, then wood.
-    final boardShape = RRect.fromRectAndRadius(boardRect.deflate(1), Radius.circular(cell * 0.2));
-    canvas.drawRRect(
-      boardShape.shift(Offset(0, cell * 0.06)),
-      Paint()
-        ..color = Colors.black.withValues(alpha: 0.35)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * 0.12),
-    );
-    canvas.drawRRect(
-      boardShape,
+    // Wood, edge to edge as in the lichess app.
+    canvas.drawRect(
+      boardRect,
       Paint()
         ..shader = LinearGradient(
           begin: Alignment.topLeft,
