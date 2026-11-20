@@ -2,7 +2,7 @@ name: tengen
 description: Tengen, an open source mobile app to play Go on online-go.com and offline.
 publish_to: "none"
 
-version: 0.6.0+14
+version: 0.6.1+15
 
 environment:
   sdk: ^3.14.0
@@ -35,18 +35,20 @@ flutter:
     - assets/goban/boards/
     - assets/goban/stones/
 
-# App icons: run `dart run flutter_launcher_icons` after changing assets/icon/.
+# App icons, wired as in github.com/prathpatel/GoGame (same artwork, same files):
+# - Android 8+: the adaptive icon is vector drawables (res/drawable/ic_launcher_background.xml, a
+#   kaya gradient, and ic_launcher_foreground.xml, also the monochrome layer for themed icons),
+#   referenced by res/mipmap-anydpi-v26/ic_launcher.xml and ic_launcher_round.xml.
+# - Older Android, iOS and web: PNGs made from assets/icon/ by `dart run flutter_launcher_icons`.
+#   That command also rewrites mipmap-anydpi-v26/ic_launcher.xml: restore it from git afterwards.
+# - tool/gen_icon.py renders assets/icon/*.png from the vector drawables.
 flutter_launcher_icons:
   android: "ic_launcher"
   ios: true
   image_path: "assets/icon/icon.png"
   adaptive_icon_background: "#F0D5A8"
   adaptive_icon_foreground: "assets/icon/icon_foreground.png"
-  # The artwork is already padded; 8% more keeps its corners inside the circular safe zone
-  # (the default 16% makes the board needlessly small).
-  adaptive_icon_foreground_inset: 8
   remove_alpha_ios: true
-  min_sdk_android: 21
   web:
     generate: true
     image_path: "assets/icon/icon.png"
