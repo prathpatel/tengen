@@ -77,11 +77,6 @@ class HomeScreen extends ConsumerWidget {
                               style: theme.textTheme.headlineSmall?.copyWith(fontSize: 24),
                             ),
                           ),
-                          _BoardChip(
-                            board: prefs.boardTheme,
-                            onTap: () => pushFullScreen<void>(context, const SettingsScreen()),
-                          ),
-                          const SizedBox(width: 10),
                           _Avatar(
                             user: user,
                             signedIn: signedIn,
@@ -345,39 +340,6 @@ class _HubCards extends ConsumerWidget {
   }
 }
 
-/// The board in use, opening the settings.
-class _BoardChip extends StatelessWidget {
-  const _BoardChip({required this.board, required this.onTap});
-
-  final BoardTheme board;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Material(
-      color: scheme.surfaceContainer,
-      shape: const StadiumBorder(),
-      child: InkWell(
-        customBorder: const StadiumBorder(),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              BoardSwatch(board: board, size: 28),
-              const SizedBox(width: 10),
-              Text(board.label, style: theme.textTheme.titleSmall),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// A small square of a board's wood (or color).
 class BoardSwatch extends StatelessWidget {
   const BoardSwatch({required this.board, required this.size, super.key});
@@ -457,6 +419,7 @@ class _AccountSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider).value;
     final signedIn = auth?.isSignedIn ?? false;
+    final board = ref.watch(preferencesProvider.select((p) => p.boardTheme));
     final theme = Theme.of(context);
     void go(Widget screen) {
       Navigator.pop(context);
@@ -495,6 +458,12 @@ class _AccountSheet extends ConsumerWidget {
             ListTile(
               leading: const Icon(Icons.settings_outlined),
               title: const Text('Settings'),
+              onTap: () => go(const SettingsScreen()),
+            ),
+            ListTile(
+              leading: BoardSwatch(board: board, size: 24),
+              title: const Text('Board and stones'),
+              subtitle: Text(board.label),
               onTap: () => go(const SettingsScreen()),
             ),
             ListTile(

@@ -569,3 +569,87 @@ Future<T?> showTengenSheet<T>(BuildContext context, Widget child, {double topGap
         );
       },
     );
+
+/// What a [FeedbackCard] says: a success, a mistake, a hint or a comment.
+enum FeedbackKind { success, failure, hint, comment }
+
+/// The result of a move in a puzzle or a lesson, a hint, or the author's comment: a softly
+/// tinted card with a round badge, a title and an explanation.
+class FeedbackCard extends StatelessWidget {
+  const FeedbackCard({
+    required this.kind,
+    required this.title,
+    this.body,
+    this.padding = const EdgeInsets.fromLTRB(16, 14, 16, 4),
+    super.key,
+  });
+
+  final FeedbackKind kind;
+  final String title;
+  final String? body;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final (Color color, IconData icon) = switch (kind) {
+      FeedbackKind.success => (scheme.secondary, Icons.check_rounded),
+      FeedbackKind.failure => (scheme.error, Icons.close_rounded),
+      FeedbackKind.hint => (scheme.primary, Icons.lightbulb_rounded),
+      FeedbackKind.comment => (scheme.onSurfaceVariant, Icons.chat_bubble_rounded),
+    };
+    return Padding(
+      padding: padding,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 14, 18, 14),
+        decoration: BoxDecoration(
+          color: Color.alphaBlend(color.withValues(alpha: 0.12), scheme.surfaceContainer),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          crossAxisAlignment: body == null ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              child: Icon(icon, size: 22, color: scheme.surfaceContainerLowest),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                // Its own height: under a board, the card must not take the board's room.
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: kind == FeedbackKind.comment ? FontWeight.w500 : FontWeight.w700,
+                      height: 1.3,
+                    ),
+                  ),
+                  if (body != null) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      body!,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -165,9 +165,13 @@ void main() {
           await tester.tap(find.byTooltip('Close'));
           await tester.pumpAndSettle();
 
-          // Settings, from the board chip.
-          await tester.ensureVisible(find.text('Kaya'));
+          // The header has no board chip; the board is in the account sheet.
+          expect(find.text('Kaya'), findsNothing);
+          await tester.ensureVisible(find.byTooltip('alice'));
           await tester.pumpAndSettle();
+          await tester.tap(find.byTooltip('alice'));
+          await tester.pumpAndSettle();
+          expect(find.text('Board and stones'), findsOneWidget);
           await tester.tap(find.text('Kaya'));
           await tester.pumpAndSettle();
           await tester.scrollUntilVisible(

@@ -136,7 +136,7 @@ class _PlayBotTabState extends ConsumerState<PlayBotTab> {
               Expanded(
                 child: _ToggleCard(
                   title: 'Rated',
-                  subtitle: 'Counts for rank',
+                  subtitle: 'Counts for your rank',
                   value: settings.ranked,
                   onChanged: (v) => update(settings.copyWith(ranked: v)),
                 ),
@@ -145,7 +145,7 @@ class _PlayBotTabState extends ConsumerState<PlayBotTab> {
               Expanded(
                 child: _ToggleCard(
                   title: 'Handicap',
-                  subtitle: 'From the ranks',
+                  subtitle: 'Stones from the ranks',
                   value: settings.handicap,
                   onChanged: (v) => update(settings.copyWith(handicap: v)),
                 ),
@@ -199,27 +199,32 @@ class _ToggleCard extends StatelessWidget {
     final theme = Theme.of(context);
     return MergeSemantics(
       child: SoftCard(
-        padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
         onTap: () => onChanged(!value),
-        child: Row(
+        // The title and the switch on a line, the explanation below with the card's whole
+        // width: narrow cards no longer break words.
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: theme.textTheme.titleMedium),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+            Row(
+              children: [
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(title, maxLines: 1, style: theme.textTheme.titleMedium),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 8),
+                Switch(value: value, onChanged: onChanged),
+              ],
             ),
-            Switch(value: value, onChanged: onChanged),
+            Text(
+              subtitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
           ],
         ),
       ),

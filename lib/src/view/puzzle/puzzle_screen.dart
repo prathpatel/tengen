@@ -132,37 +132,34 @@ class _PuzzleBodyState extends ConsumerState<_PuzzleBody> {
     final hint = _hint;
 
     // The card under the board: the result, the hint, or the comment of the position.
+    final hintText = hint == null || hint.isEmpty
+        ? null
+        : hint.map((p) => prettyCoordinate(p, puzzle.board.height)).join(' or ');
+    // The author's comment on the move played; a move outside the tree has none (the node is
+    // still the one before it).
+    final moveComment = state.node == puzzle.root ? null : state.node.text;
     final Widget? card = switch (state.status) {
-      PuzzleStatus.correct => _StatusCard(
-        icon: Icons.check_rounded,
+      PuzzleStatus.correct => FeedbackCard(
+        kind: FeedbackKind.success,
         title: 'Correct!',
-        text: state.node.text,
-        color: scheme.secondary,
-        background: scheme.secondaryContainer,
+        body: moveComment ?? 'Solved. Tap Next for the next puzzle.',
       ),
-      PuzzleStatus.wrong => _StatusCard(
-        icon: Icons.close_rounded,
+      PuzzleStatus.wrong => FeedbackCard(
+        kind: FeedbackKind.failure,
         title: 'Not the answer',
-        text: state.node.text ?? 'Tap Retry to try again.',
-        color: scheme.error,
-        background: scheme.errorContainer,
+        body: moveComment ?? 'Tap Retry to try again.',
       ),
-      PuzzleStatus.solving when hint != null => _StatusCard(
-        icon: Icons.lightbulb_outline_rounded,
-        title: hint.isEmpty
-            ? 'No hint for this position'
-            : 'Hint: try ${hint.map((p) => prettyCoordinate(p, puzzle.board.height)).join(' or ')}',
+      PuzzleStatus.solving when hint != null => FeedbackCard(
+        kind: FeedbackKind.hint,
+        title: hintText == null ? 'No hint for this position' : 'Try $hintText',
         // The comment the puzzle's author wrote on that move, if any.
-        text: hint.map((p) => state.node.branchAt(p)?.text).nonNulls.firstOrNull,
-        color: scheme.primary,
-        background: scheme.surfaceContainer,
-        outlined: true,
+        body:
+            hint.map((p) => state.node.branchAt(p)?.text).nonNulls.firstOrNull ??
+            (hintText == null ? null : 'Circled on the board.'),
       ),
-      PuzzleStatus.solving when state.node.text != null => _StatusCard(
-        icon: Icons.chat_bubble_outline_rounded,
+      PuzzleStatus.solving when state.node.text != null => FeedbackCard(
+        kind: FeedbackKind.comment,
         title: state.node.text!,
-        color: scheme.onSurfaceVariant,
-        background: scheme.surfaceContainer,
       ),
       _ => null,
     };
@@ -239,74 +236,6 @@ class _PuzzleBodyState extends ConsumerState<_PuzzleBody> {
           ),
           RoundAction(icon: Icons.chevron_right_rounded, label: 'Next', onPressed: widget.onNext),
         ],
-      ),
-    );
-  }
-}
-
-/// The result, a hint or a comment, under the board.
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({
-    required this.icon,
-    required this.title,
-    required this.color,
-    required this.background,
-    this.text,
-    this.outlined = false,
-  });
-
-  final IconData icon;
-  final String title;
-  final String? text;
-  final Color color;
-  final Color background;
-  final bool outlined;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: outlined ? color : color.withValues(alpha: 0.35), width: 1.5),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 26),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                // Its own height: under the board, the card must not take the board's room.
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium?.copyWith(color: color, fontSize: 18),
-                  ),
-                  if (text != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      text!,
-                      maxLines: 5,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

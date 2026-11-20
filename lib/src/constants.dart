@@ -5,7 +5,7 @@ const kOgsHost = String.fromEnvironment('OGS_HOST', defaultValue: 'online-go.com
 const kOgsWsHost = String.fromEnvironment('OGS_WS_HOST', defaultValue: kOgsHost);
 
 const kAppName = 'Tengen';
-const kAppVersion = '0.7.0';
+const kAppVersion = '0.7.1';
 
 /// Identifies this client to the OGS realtime server.
 const kOgsClientName = 'tengen';

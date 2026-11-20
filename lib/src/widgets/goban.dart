@@ -249,8 +249,13 @@ class _GobanState extends State<Goban> {
   Widget build(BuildContext context) {
     final board = widget.board;
     final viewport = widget.viewport ?? GobanViewport.full(board);
+    // The shape of the painted board, margins included: a cropped (non square) view must not
+    // leave empty space on a side.
+    final margin = widget.showCoordinates
+        ? GobanGeometry.coordinatesMargin
+        : GobanGeometry.plainMargin;
     return AspectRatio(
-      aspectRatio: viewport.columns / viewport.rows,
+      aspectRatio: (viewport.columns - 1 + 2 * margin) / (viewport.rows - 1 + 2 * margin),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final size = constraints.biggest;
@@ -286,7 +291,6 @@ class _GobanState extends State<Goban> {
                   previewColor: widget.toPlay,
                   deadStones: widget.deadStones,
                   territory: widget.territory,
-                  accent: Theme.of(context).colorScheme.primary,
                 ),
               ),
             ),
@@ -313,11 +317,7 @@ class _GobanPainter extends CustomPainter {
     required this.previewColor,
     required this.deadStones,
     required this.territory,
-    required this.accent,
   }) : super(repaint: GobanArt.instance);
-
-  /// The last move marker, in the app's accent.
-  final Color accent;
 
   final Board board;
   final GobanViewport viewport;
@@ -413,13 +413,15 @@ class _GobanPainter extends CustomPainter {
 
     final last = lastMove;
     if (last != null && board[last] != null && !marks.containsKey(last)) {
+      final stone = board[last]!;
       canvas.drawCircle(
         geometry.offsetOf(last),
         cell * 0.22,
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = math.max(2, cell * 0.08)
-          ..color = accent,
+          // The opposite color of the stone, so that it reads on every board.
+          ..color = stone == StoneColor.black ? Colors.white : Colors.black,
       );
     }
   }
@@ -582,6 +584,5 @@ class _GobanPainter extends CustomPainter {
       old.previewColor != previewColor ||
       old.deadStones != deadStones ||
       old.territory != territory ||
-      old.geometry.cell != geometry.cell ||
-      old.accent != accent;
+      old.geometry.cell != geometry.cell;
 }

@@ -50,6 +50,11 @@ void main() {
     expect(find.text('GnuGo'), findsOneWidget);
     expect(find.text('amybot-beginner'), findsNothing);
     expect(find.text('Choose a computer opponent'), findsOneWidget);
+    // The toggle titles stay on one line.
+    expect(
+      tester.getSize(find.text('Handicap')).height,
+      lessThan(tester.getSize(find.text('Rated')).height * 1.5),
+    );
     // What the name tells of the engine.
     expect(find.text('KataGo · plays like a person of its rank'), findsOneWidget);
 

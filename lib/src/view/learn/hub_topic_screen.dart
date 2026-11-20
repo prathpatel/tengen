@@ -177,32 +177,31 @@ class _HubTopicScreenState extends ConsumerState<HubTopicScreen> {
     final nextLabel = !isLastPage ? 'Next page' : (nextTopic == null ? 'Done' : 'Next lesson');
 
     // The result, or a hint, under the board.
+    final hintText = hint == null || hint.isEmpty
+        ? null
+        : hint.map((p) => prettyCoordinate(p, page.board.height)).join(' or ');
     final Widget? card = switch (_status) {
-      PuzzleStatus.correct => _ResultCard(
-        icon: Icons.check_rounded,
+      PuzzleStatus.correct => FeedbackCard(
+        kind: FeedbackKind.success,
         title: 'Great job!',
-        color: scheme.secondary,
-        background: scheme.secondaryContainer,
+        body: !isLastPage
+            ? 'Page done. On to the next one.'
+            : (nextTopic == null ? 'You finished the course!' : 'Lesson done.'),
       ),
-      PuzzleStatus.wrong => _ResultCard(
-        icon: Icons.close_rounded,
+      PuzzleStatus.wrong => const FeedbackCard(
+        kind: FeedbackKind.failure,
         title: 'Not quite',
-        text: 'Start the page again with the retry button.',
-        color: scheme.error,
-        background: scheme.errorContainer,
+        body: 'Start the page again with the retry button.',
       ),
-      PuzzleStatus.solving when hint != null => _ResultCard(
-        icon: Icons.lightbulb_outline_rounded,
-        title: hint.isEmpty
-            ? 'No hint here'
-            : 'Hint: try ${hint.map((p) => prettyCoordinate(p, page.board.height)).join(' or ')}',
-        text: hint
-            .map((p) => (_solver?.node ?? page.moveTree)?.branchAt(p)?.text)
-            .nonNulls
-            .firstOrNull,
-        color: scheme.primary,
-        background: scheme.surfaceContainer,
-        outlined: true,
+      PuzzleStatus.solving when hint != null => FeedbackCard(
+        kind: FeedbackKind.hint,
+        title: hintText == null ? 'No hint here' : 'Try $hintText',
+        body:
+            hint
+                .map((p) => (_solver?.node ?? page.moveTree)?.branchAt(p)?.text)
+                .nonNulls
+                .firstOrNull ??
+            (hintText == null ? null : 'Circled on the board.'),
       ),
       _ => null,
     };
@@ -416,71 +415,6 @@ class _HubTopicScreenState extends ConsumerState<HubTopicScreen> {
                             child: const Text('Skip page'),
                           ),
                   ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// The result of a page, or a hint.
-class _ResultCard extends StatelessWidget {
-  const _ResultCard({
-    required this.icon,
-    required this.title,
-    required this.color,
-    required this.background,
-    this.text,
-    this.outlined = false,
-  });
-
-  final IconData icon;
-  final String title;
-  final String? text;
-  final Color color;
-  final Color background;
-  final bool outlined;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: outlined ? color : color.withValues(alpha: 0.35), width: 1.5),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              child: Icon(icon, color: background, size: 24),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                // Its own height: under the board, the card must not take the board's room.
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(title, style: theme.textTheme.titleMedium?.copyWith(color: color)),
-                  if (text != null)
-                    Text(
-                      text!,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
                 ],
               ),
             ),
