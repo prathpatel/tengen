@@ -8,110 +8,38 @@ import 'package:tengen/src/model/online_game/automatch_controller.dart';
 import 'package:tengen/src/utils/navigation.dart';
 import 'package:tengen/src/view/auth/sign_in_screen.dart';
 import 'package:tengen/src/view/offline_game/offline_game_screen.dart';
+import 'package:tengen/src/view/play/play_bot_tab.dart';
+import 'package:tengen/src/widgets/form_layout.dart';
 import 'package:tengen/src/widgets/segmented_choice.dart';
 
-/// Starts a game: online with the OGS automatch, or offline on the device.
-class PlayScreen extends StatelessWidget {
-  const PlayScreen({this.offline = false, super.key});
+enum PlayTab { online, computer, offline }
 
-  /// Opens on the offline tab.
-  final bool offline;
+/// Starts a game: online with the OGS automatch, against an OGS bot, or offline on the device.
+class PlayScreen extends StatelessWidget {
+  const PlayScreen({this.tab = PlayTab.online, super.key});
+
+  /// The tab shown first.
+  final PlayTab tab;
 
   @override
   Widget build(BuildContext context) => DefaultTabController(
-    length: 2,
-    initialIndex: offline ? 1 : 0,
+    length: PlayTab.values.length,
+    initialIndex: tab.index,
     child: Scaffold(
       appBar: AppBar(
         title: const Text('New game'),
         bottom: const TabBar(
           tabs: [
             Tab(text: 'Online'),
+            Tab(text: 'Computer'),
             Tab(text: 'Offline'),
           ],
         ),
       ),
-      body: const TabBarView(children: [_OnlinePlay(), _OfflinePlay()]),
+      body: const TabBarView(children: [_OnlinePlay(), PlayBotTab(), _OfflinePlay()]),
     ),
   );
 }
-
-class _Labeled extends StatelessWidget {
-  const _Labeled(this.label, this.child);
-
-  final String label;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 8),
-        child,
-      ],
-    ),
-  );
-}
-
-/// A scrolling form with its main button pinned at the bottom, above the system navigation bar.
-/// The content is capped in width on tablets.
-class _FormWithAction extends StatelessWidget {
-  const _FormWithAction({required this.children, required this.action});
-
-  final List<Widget> children;
-  final Widget action;
-
-  static const maxWidth = 560.0;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Expanded(
-        child: ListView(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          children: [
-            Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: maxWidth),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
-              ),
-            ),
-          ],
-        ),
-      ),
-      DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(
-              color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.3),
-            ),
-          ),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: maxWidth),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                child: SizedBox(width: double.infinity, height: 52, child: action),
-              ),
-            ),
-          ),
-        ),
-      ),
-    ],
-  );
-}
-
-Widget _sizeSelector(int size, ValueChanged<int> onChanged) => SegmentedChoice<int>(
-  choices: const [Choice(9, '9×9'), Choice(13, '13×13'), Choice(19, '19×19')],
-  selected: size,
-  onChanged: onChanged,
-);
 
 class _OnlinePlay extends ConsumerStatefulWidget {
   const _OnlinePlay();
@@ -175,7 +103,7 @@ class _OnlinePlayState extends ConsumerState<_OnlinePlay> {
       );
     }
 
-    return _FormWithAction(
+    return FormWithAction(
       action: FilledButton.icon(
         icon: const Icon(Icons.search),
         label: FittedBox(
@@ -188,11 +116,11 @@ class _OnlinePlayState extends ConsumerState<_OnlinePlay> {
         onPressed: () => ref.read(automatchProvider.notifier).find(settings),
       ),
       children: [
-        _Labeled(
+        LabeledField(
           'Board size',
-          _sizeSelector(settings.size, (v) => update(settings.copyWith(size: v))),
+          boardSizeSelector(settings.size, (v) => update(settings.copyWith(size: v))),
         ),
-        _Labeled(
+        LabeledField(
           'Speed',
           Column(
             children: [
@@ -253,7 +181,7 @@ class _OnlinePlayState extends ConsumerState<_OnlinePlay> {
           ),
         ),
         if (settings.speed != GameSpeed.correspondence) ...[
-          _Labeled(
+          LabeledField(
             'Clock',
             SegmentedChoice<ClockSystem>(
               choices: [for (final c in ClockSystem.values) Choice(c, c.label)],
@@ -273,7 +201,7 @@ class _OnlinePlayState extends ConsumerState<_OnlinePlay> {
             onChanged: (v) => update(settings.copyWith(flexibleClock: v)),
           ),
         ],
-        _Labeled(
+        LabeledField(
           'Handicaps',
           SegmentedChoice<HandicapMode>(
             choices: [for (final h in HandicapMode.values) Choice(h, h.label)],
@@ -288,7 +216,7 @@ class _OnlinePlayState extends ConsumerState<_OnlinePlay> {
             style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ),
-        _Labeled(
+        LabeledField(
           'Opponent rank: ${settings.lowerRankDiff} below to ${settings.upperRankDiff} above you',
           RangeSlider(
             min: -9,
@@ -334,34 +262,44 @@ class _OfflinePlayState extends State<_OfflinePlay> {
   @override
   Widget build(BuildContext context) {
     final maxHandicap = _setup.size == 9 ? 5 : 9;
-    return _FormWithAction(
+    return FormWithAction(
       action: FilledButton.icon(
         icon: const Icon(Icons.play_arrow),
         label: const Text('Start game'),
         onPressed: () => pushFullScreen<void>(context, OfflineGameScreen(setup: _setup)),
       ),
       children: [
-        _Labeled(
+        LabeledField(
           'Opponent',
           SegmentedChoice<OfflineOpponent>(
             choices: const [
-              Choice(OfflineOpponent.bot, 'Computer', icon: Icons.smart_toy_outlined),
+              Choice(OfflineOpponent.bot, 'Simple bot', icon: Icons.smart_toy_outlined),
               Choice(OfflineOpponent.human, 'Pass and play', icon: Icons.people_outline),
             ],
             selected: _setup.opponent,
             onChanged: (v) => _update((x) => x.copyWith(opponent: v)),
           ),
         ),
-        _Labeled(
+        LabeledField(
           'Board size',
-          _sizeSelector(
+          boardSizeSelector(
             _setup.size,
             (v) =>
                 _update((x) => x.copyWith(size: v, handicap: x.handicap.clamp(0, v == 9 ? 5 : 9))),
           ),
         ),
         if (_setup.opponent == OfflineOpponent.bot)
-          _Labeled(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+            child: Text(
+              'A beginner level bot that runs on your phone, without internet. For a real '
+              'opponent, play the KataGo and other OGS bots in the Computer tab.',
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          ),
+        if (_setup.opponent == OfflineOpponent.bot)
+          LabeledField(
             'Your color',
             SegmentedChoice<StoneColor>(
               choices: const [Choice(StoneColor.black, 'Black'), Choice(StoneColor.white, 'White')],

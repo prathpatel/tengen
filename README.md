@@ -20,6 +20,9 @@ This is an unofficial client, not affiliated with OGS or Lichess.
 
 ## Features
 
+- **Play the computer** on OGS: the bots online on online-go.com (KataGo, including its human-like
+  versions from 15k to 1d, GnuGo, Fuego and others), grouped by strength, with the settings each
+  bot accepts checked as the OGS website does.
 - **Offline games** against a small built-in bot, or pass and play, on 9×9, 13×13 and 19×19, with
   Japanese, Chinese, AGA, Korean, New Zealand and Ing rules, handicap, undo, counting with dead
   stone marking, and SGF export.

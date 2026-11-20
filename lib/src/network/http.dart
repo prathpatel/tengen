@@ -106,4 +106,9 @@ class OgsHttp {
     );
     return _decode(response);
   }
+
+  Future<dynamic> delete(String path) async {
+    final response = await _client.delete(ogsUri(path), headers: _headers(unsafe: true));
+    return _decode(response);
+  }
 }

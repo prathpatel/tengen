@@ -49,7 +49,7 @@ class MoreTabScreen extends ConsumerWidget {
               CardRow(
                 icon: Icons.smart_toy_outlined,
                 title: 'Play the computer',
-                onTap: () => pushFullScreen<void>(context, const PlayScreen(offline: true)),
+                onTap: () => pushFullScreen<void>(context, const PlayScreen(tab: PlayTab.computer)),
               ),
               CardRow(
                 icon: Icons.people_outline,

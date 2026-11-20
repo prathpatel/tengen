@@ -5,7 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:tengen/src/constants.dart';
 import 'package:tengen/src/model/go/game.dart';
+import 'package:tengen/src/model/ogs/bots.dart';
 import 'package:tengen/src/model/ogs/game_data.dart';
+import 'package:tengen/src/model/online_game/automatch_controller.dart';
 import 'package:tengen/src/model/puzzle/puzzle.dart';
 import 'package:tengen/src/network/http.dart';
 import 'package:tengen/src/network/socket.dart';
@@ -49,13 +51,33 @@ List<String> replayWithValidation(OgsGameData data) {
 void main() {
   late OgsHttp api;
   late OgsSocket socket;
+  late Future<Object?> activeBots;
 
   setUpAll(() async {
     api = OgsHttp(http.Client());
     final config = asMap(await api.get('/api/v1/ui/config'))!;
-    socket = OgsSocket(uri: ogsWsUri())
+    socket = OgsSocket(uri: ogsWsUri());
+    activeBots = socket.on('active-bots').first;
+    socket
       ..authenticate(jwt: config['user_jwt'] as String)
       ..connect();
+  });
+
+  test('lists the OGS bots, and some accept a 9×9 rapid game', () async {
+    final data = asMap(await activeBots.timeout(const Duration(seconds: 20)))!;
+    final bots = [for (final b in data.values) OgsBot.fromJson(asMap(b)!)];
+    expect(bots, isNotEmpty);
+    final options = BotGameOptions(
+      size: 9,
+      clock: BotClock(9, GameSpeed.rapid, ClockSystem.fischer),
+    );
+    final accepting = [
+      for (final b in bots)
+        if (botAccepts(b, options).clock != null) '${b.username} (${b.rankLabel})',
+    ];
+    // ignore: avoid_print
+    print('${bots.length} bots online; for 9×9 rapid: ${accepting.join(', ')}');
+    expect(accepting, isNotEmpty);
   });
 
   tearDownAll(() => socket.dispose());

@@ -92,6 +92,14 @@ class OgsSocket {
   /// The data of the events named [name].
   Stream<Object?> on(String name) => events.where((e) => e.name == name).map((e) => e.data);
 
+  /// Events the server sends unasked when the connection opens (such as `active-bots`, the
+  /// online bots): their last data is kept, for listeners that come later.
+  static const retainedEvents = {'active-bots'};
+  final Map<String, Object?> _retained = {};
+
+  /// The last data of a [retainedEvents] event, if it came.
+  Object? latest(String name) => _retained[name];
+
   void _setStatus(SocketStatus status) {
     if (_status == status) return;
     _status = status;
@@ -199,6 +207,7 @@ class OgsSocket {
           clockDriftMs = (now - rtt / 2 - server).round();
         }
       }
+      if (retainedEvents.contains(head)) _retained[head] = data;
       if (!_events.isClosed) _events.add(SocketEvent(head, data));
     }
   }

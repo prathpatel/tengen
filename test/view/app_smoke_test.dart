@@ -10,6 +10,7 @@ import 'package:tengen/src/view/more/more_tab_screen.dart';
 import 'package:tengen/src/view/settings/settings_screen.dart';
 
 import '../fakes.dart';
+import '../model/ogs/bots_test.dart' show botJson;
 
 const signedInConfig = {
   'user': {'id': 42, 'username': 'alice', 'ranking': 20},
@@ -122,6 +123,16 @@ void main() {
           await tester.tap(find.text('Required'));
           await tester.pump();
           expect(find.textContaining('Play 9×9 rapid'), findsOneWidget);
+          await tester.tap(find.text('Computer'));
+          // The bot list loads until the server sends it (a spinner: no settling).
+          await tester.pump(const Duration(milliseconds: 500));
+          sockets.single.serverSend('active-bots', {
+            '1': botJson(id: 1, username: 'a-bot-with-a-rather-long-name-indeed', ranking: 20),
+            '2': botJson(id: 2, username: '1d-kgs-humanlike-kata', ranking: 29.4, sizes: [19]),
+          });
+          await tester.pumpAndSettle();
+          expect(find.text('Choose a computer opponent'), findsOneWidget);
+          expect(tester.takeException(), isNull, reason: 'computer');
           await tester.tap(find.text('Offline'));
           await tester.pumpAndSettle();
           expect(find.text('Start game'), findsOneWidget);
