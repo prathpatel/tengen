@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/model/go/result.dart';
+import 'package:tengen/src/widgets/ui.dart';
 
 /// An action of the result dialog. The dialog closes before [onPressed] runs.
 typedef ResultAction = ({String label, VoidCallback onPressed, bool primary});
@@ -47,7 +48,8 @@ Future<void> showResultDialog(
                           },
                           child: Text(action.label),
                         )
-                      : FilledButton.tonal(
+                      : FilledButton(
+                          style: softButtonStyle(dialogContext),
                           onPressed: () {
                             Navigator.pop(dialogContext);
                             action.onPressed();

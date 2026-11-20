@@ -5,7 +5,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/model/puzzle/puzzle.dart';
 import 'package:tengen/src/utils/navigation.dart';
 import 'package:tengen/src/view/puzzle/puzzle_screen.dart';
-import 'package:tengen/src/view/puzzle/puzzle_tab_screen.dart';
+import 'package:tengen/src/view/puzzle/puzzles_sheet.dart';
+import 'package:tengen/src/widgets/ui.dart';
 
 /// Browse and search the OGS puzzle collections.
 class PuzzleCollectionsScreen extends ConsumerStatefulWidget {
@@ -29,7 +30,7 @@ class _PuzzleCollectionsScreenState extends ConsumerState<PuzzleCollectionsScree
   Widget build(BuildContext context) {
     final results = ref.watch(collectionSearchProvider(_search));
     return Scaffold(
-      appBar: AppBar(title: const Text('Puzzle collections')),
+      appBar: const TopBar(title: 'Puzzle collections'),
       body: Column(
         children: [
           Padding(

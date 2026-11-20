@@ -1,16 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/model/auth/auth_controller.dart';
-import 'package:tengen/src/model/go/board.dart';
 import 'package:tengen/src/model/ogs/chat.dart';
 import 'package:tengen/src/model/online_game/online_game_controller.dart';
 import 'package:tengen/src/widgets/player_bar.dart';
+import 'package:tengen/src/widgets/segmented_choice.dart';
+import 'package:tengen/src/widgets/ui.dart';
 
 /// Opens the chat of an OGS game in a bottom sheet.
 Future<void> showGameChat(BuildContext context, int gameId) => showModalBottomSheet<void>(
   context: context,
   isScrollControlled: true,
-  showDragHandle: true,
   useSafeArea: true,
   builder: (_) => GameChatSheet(gameId: gameId),
 );
@@ -28,6 +28,9 @@ class GameChatSheet extends ConsumerStatefulWidget {
 class _GameChatSheetState extends ConsumerState<GameChatSheet> {
   final _input = TextEditingController();
 
+  /// The spectators' channel rather than the game's.
+  bool _spectators = false;
+
   @override
   void dispose() {
     _input.dispose();
@@ -44,34 +47,111 @@ class _GameChatSheetState extends ConsumerState<GameChatSheet> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(onlineGameProvider(widget.gameId)).value;
-    final signedIn = ref.watch(authProvider).value?.isSignedIn ?? false;
+    final me = ref.watch(authProvider).value;
+    final signedIn = me?.isSignedIn ?? false;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final chat = state?.chat ?? const <GameChatLine>[];
+    final all = state?.chat ?? const <GameChatLine>[];
+    // OGS puts the spectators' messages in their own channel during a game.
+    final spectatorLines = all.where((l) => l.channel == 'spectator').toList();
+    final chat = _spectators && spectatorLines.isNotEmpty
+        ? spectatorLines
+        : all.where((l) => l.channel != 'spectator').toList();
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final isPlayer = state?.isPlayer ?? false;
 
-    StoneColor? colorOf(GameChatLine line) => state?.data.colorOf(line.playerId);
-
-    return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.65,
-      child: Padding(
-        padding: EdgeInsets.only(bottom: bottomInset),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Row(
+    // Items, newest first (the list is reversed): messages, with the move they were written at
+    // when it changes.
+    final items = <Widget>[];
+    for (var i = chat.length - 1; i >= 0; i--) {
+      final line = chat[i];
+      final mine = signedIn && line.playerId == me!.user.id;
+      final color = state?.data.colorOf(line.playerId);
+      items.add(
+        Align(
+          alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.78),
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+              decoration: BoxDecoration(
+                color: mine ? scheme.primary : scheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Chat', style: theme.textTheme.titleLarge),
-                  const Spacer(),
+                  if (!mine)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (color != null) ...[
+                          StoneIcon(color, size: 12),
+                          const SizedBox(width: 6),
+                        ],
+                        Flexible(
+                          child: Text(
+                            line.isBot ? '${line.username} (bot)' : line.username,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   Text(
-                    state?.isPlayer ?? false ? 'Seen by your opponent' : 'Seen by spectators',
-                    style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                    line.text,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: mine ? scheme.onPrimary : scheme.onSurface,
+                    ),
                   ),
                 ],
               ),
             ),
-            const Divider(height: 1),
+          ),
+        ),
+      );
+      final move = line.moveNumber;
+      final previousMove = i > 0 ? chat[i - 1].moveNumber : null;
+      if (move != null && (i == 0 || previousMove != move)) {
+        items.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 12, bottom: 4),
+            child: Center(
+              child: Text(
+                'Move $move',
+                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * 0.62,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SheetTitle('Chat', close: true),
+            if (spectatorLines.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+                child: SegmentedChoice<bool>(
+                  choices: [
+                    Choice(false, isPlayer ? 'With opponent' : 'Players'),
+                    Choice(true, 'Spectators · ${spectatorLines.length}'),
+                  ],
+                  selected: _spectators,
+                  onChanged: (v) => setState(() => _spectators = v),
+                ),
+              ),
             Expanded(
               child: chat.isEmpty
                   ? Center(
@@ -80,68 +160,25 @@ class _GameChatSheetState extends ConsumerState<GameChatSheet> {
                         style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                       ),
                     )
-                  : ListView.builder(
+                  : ListView(
                       reverse: true,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: chat.length,
-                      itemBuilder: (context, i) {
-                        final line = chat[chat.length - 1 - i];
-                        final color = colorOf(line);
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(top: 3, right: 8),
-                                child: color != null
-                                    ? StoneIcon(color, size: 14)
-                                    : Icon(
-                                        Icons.visibility_outlined,
-                                        size: 16,
-                                        color: scheme.onSurfaceVariant,
-                                      ),
-                              ),
-                              Expanded(
-                                child: Text.rich(
-                                  TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text: line.username,
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          color: color != null ? scheme.primary : null,
-                                        ),
-                                      ),
-                                      if (line.isBot)
-                                        TextSpan(
-                                          text: ' (bot)',
-                                          style: TextStyle(color: scheme.onSurfaceVariant),
-                                        ),
-                                      if (line.moveNumber != null)
-                                        TextSpan(
-                                          text: '  move ${line.moveNumber}',
-                                          style: theme.textTheme.bodySmall?.copyWith(
-                                            color: scheme.onSurfaceVariant,
-                                          ),
-                                        ),
-                                      TextSpan(text: '\n${line.text}'),
-                                    ],
-                                  ),
-                                  style: theme.textTheme.bodyMedium,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                      children: items,
                     ),
             ),
-            const Divider(height: 1),
+            if (signedIn && chat.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+                child: Text(
+                  isPlayer ? 'Seen by your opponent' : 'Seen by the players and spectators',
+                  textAlign: TextAlign.right,
+                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ),
             SafeArea(
               top: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                padding: const EdgeInsets.fromLTRB(20, 6, 20, 14),
                 child: signedIn
                     ? Row(
                         children: [
@@ -151,29 +188,41 @@ class _GameChatSheetState extends ConsumerState<GameChatSheet> {
                               textInputAction: TextInputAction.send,
                               onSubmitted: (_) => _send(),
                               maxLength: 500,
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 hintText: 'Message',
                                 counterText: '',
-                                isDense: true,
-                                border: OutlineInputBorder(),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 22,
+                                  vertical: 16,
+                                ),
                               ),
                             ),
                           ),
-                          IconButton(
-                            tooltip: 'Send',
-                            icon: const Icon(Icons.send),
-                            onPressed: _send,
+                          const SizedBox(width: 12),
+                          Tooltip(
+                            message: 'Send',
+                            child: Material(
+                              color: scheme.primary,
+                              shape: const CircleBorder(),
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: _send,
+                                child: SizedBox.square(
+                                  dimension: 56,
+                                  child: Icon(Icons.send_rounded, color: scheme.onPrimary),
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       )
-                    : Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Text(
-                          'Sign in to chat.',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
+                    : Text(
+                        'Sign in to chat.',
+                        style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                       ),
               ),
             ),

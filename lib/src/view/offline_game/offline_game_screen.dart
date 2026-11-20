@@ -13,6 +13,7 @@ import 'package:tengen/src/widgets/goban.dart';
 import 'package:tengen/src/widgets/move_list.dart';
 import 'package:tengen/src/widgets/player_bar.dart';
 import 'package:tengen/src/widgets/result_dialog.dart';
+import 'package:tengen/src/widgets/ui.dart';
 
 /// A game played on the device, against the computer or pass and play.
 class OfflineGameScreen extends ConsumerStatefulWidget {
@@ -28,6 +29,9 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
   /// The number of moves shown on the board when looking at an earlier position; null follows
   /// the game.
   int? _reviewPly;
+
+  /// The move list shown under the board, with the move by move controls.
+  bool _showMoves = false;
 
   OfflineGameSetup get setup => widget.setup;
 
@@ -86,9 +90,6 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
     final controller = ref.read(provider.notifier);
     final prefs = ref.watch(preferencesProvider);
     ref.listen(provider.select((s) => s.phase), (previous, phase) {
-      if (phase == OfflinePhase.scoring && previous == OfflinePhase.playing) {
-        showSnack(context, 'Both passed: tap the dead stones, then Accept.');
-      }
       if (previous != OfflinePhase.finished && phase == OfflinePhase.finished) _showResult();
     });
 
@@ -104,32 +105,43 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
 
     // Against the computer, the user is at the bottom; in pass and play black is.
     final bottomColor = setup.opponent == OfflineOpponent.bot ? setup.humanColor : StoneColor.black;
+    final vsBot = setup.opponent == OfflineOpponent.bot;
 
-    Widget bar(StoneColor color) => PlayerBar(
-      color: color,
-      name: _name(color),
-      isBot: color == setup.botColor,
-      captures: position.capturesOf(color),
-      komi: color == StoneColor.white ? game.komi : null,
-      active: live && state.phase == OfflinePhase.playing && game.toMove == color,
-      thinking: color == setup.botColor && state.botThinking,
-      note: live && game.position.lastMove?.isPass == true && game.position.lastMove!.color == color
-          ? 'Passed'
-          : null,
-    );
+    Widget pill(StoneColor color) {
+      final captures = position.capturesOf(color);
+      final toMove = live && state.phase == OfflinePhase.playing && game.toMove == color;
+      return PlayerPill(
+        color: color,
+        name: _name(color),
+        isBot: color == setup.botColor,
+        end: color == bottomColor,
+        active: toMove,
+        thinking: color == setup.botColor && state.botThinking,
+        detail: [
+          if (toMove && color != setup.botColor && vsBot) 'Your move',
+          if (toMove && !vsBot) 'To play',
+          '$captures ${captures == 1 ? 'capture' : 'captures'}',
+          if (color == StoneColor.white && game.komi != 0) 'komi ${_points(game.komi)}',
+        ].join(' · '),
+        note:
+            live && game.position.lastMove?.isPass == true && game.position.lastMove!.color == color
+            ? 'Passed'
+            : null,
+      );
+    }
 
-    // The phase is told in the title, not in a banner, so that the board keeps its size.
-    final String subtitle;
-    if (scoring && score != null) {
-      subtitle =
-          'Counting · ${score.resultString} '
-          '(B ${_points(score.black.total)} · W ${_points(score.white.total)})';
-    } else if (finished) {
-      subtitle = 'Game over · ${state.result}';
+    final String title;
+    if (finished) {
+      title = 'Game over · ${state.result}';
     } else {
-      subtitle =
-          '${setup.size}×${setup.size} · ${setup.ruleset.label}'
-          '${setup.handicap > 1 ? ' · ${setup.handicap} handicap' : ''}';
+      title = [
+        if (game.moveCount > 0) 'Move ${game.moveCount}',
+        if (game.moveCount == 0 && vsBot) 'vs Computer',
+        if (game.moveCount == 0 && !vsBot) 'Pass and play',
+        '${setup.size}×${setup.size}',
+        setup.ruleset.label,
+        if (setup.handicap > 1) '${setup.handicap} handicap',
+      ].join(' · ');
     }
 
     void copySgf() {
@@ -147,35 +159,30 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
       showSnack(context, 'SGF copied to the clipboard');
     }
 
+    Future<void> newGame() async {
+      if (finished ||
+          game.moveCount == 0 ||
+          await confirm(context, title: 'Start a new game?', confirmLabel: 'New game')) {
+        setState(() {
+          _reviewPly = null;
+          _showMoves = false;
+        });
+        controller.restart();
+      }
+    }
+
     Future<void> showMenu() => showModalBottomSheet<void>(
       context: context,
-      showDragHandle: true,
       builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (state.phase == OfflinePhase.playing)
-              ListTile(
-                leading: const Icon(Icons.flag_outlined),
-                title: const Text('Resign'),
-                onTap: () async {
-                  Navigator.pop(sheetContext);
-                  if (await confirm(context, title: 'Resign?', confirmLabel: 'Resign')) {
-                    controller.resign();
-                  }
-                },
-              ),
             ListTile(
-              leading: const Icon(Icons.refresh),
+              leading: const Icon(Icons.refresh_rounded),
               title: const Text('New game'),
-              onTap: () async {
+              onTap: () {
                 Navigator.pop(sheetContext);
-                if (finished ||
-                    game.moveCount == 0 ||
-                    await confirm(context, title: 'Start a new game?', confirmLabel: 'New game')) {
-                  setState(() => _reviewPly = null);
-                  controller.restart();
-                }
+                newGame();
               },
             ),
             ListTile(
@@ -199,23 +206,144 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
       ),
     );
 
-    return Scaffold(
-      appBar: AppBar(
-        title: GameTitle(
-          icon: setup.botColor != null ? Icons.smart_toy_outlined : Icons.people_outline,
-          title: setup.botColor != null ? 'vs Computer' : 'Pass and play',
-          subtitle: subtitle,
+    final Widget above;
+    final Widget below;
+    final Widget actions;
+    if (scoring && score != null) {
+      above = const GamePrompt(
+        icon: Icons.front_hand_outlined,
+        text: 'Both passed. Tap the dead stones, then Accept.',
+      );
+      final mine = vsBot ? setup.humanColor : null;
+      final winner = score.winner;
+      below = ScoreCard(
+        lines: [
+          for (final c in [bottomColor, bottomColor.opposite])
+            ScoreLine(
+              color: c,
+              name: vsBot ? (c == setup.botColor ? 'Bot' : 'You') : _name(c),
+              detail: scoreDetail(c == StoneColor.black ? score.black : score.white),
+              total: (c == StoneColor.black ? score.black : score.white).total,
+            ),
+        ],
+        verdict: winner == null
+            ? 'Jigo'
+            : '${mine == null ? _name(winner) : (winner == mine ? 'You' : 'Bot')} '
+                  '${mine == null || winner != mine ? 'wins' : 'win'} by ${_points(score.margin)}',
+        result: score.resultString,
+      );
+      actions = GameButtons(
+        secondary: FilledButton(
+          style: softButtonStyle(context),
+          onPressed: controller.resumePlay,
+          child: const Text('Resume play'),
         ),
+        primary: FilledButton(onPressed: controller.acceptScore, child: const Text('Accept')),
+      );
+    } else {
+      above = pill(bottomColor.opposite);
+      below = _showMoves
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: MoveList(
+                moves: game.moves,
+                boardHeight: game.height,
+                selected: ply,
+                onSelect: (p) => _showPly(p, game.moveCount),
+              ),
+            )
+          : pill(bottomColor);
+      actions = RoundActionBar(
+        actions: _showMoves
+            ? [
+                RoundAction(
+                  icon: Icons.chevron_left_rounded,
+                  label: 'Previous',
+                  onPressed: ply > 0 ? () => _showPly(ply - 1, game.moveCount) : null,
+                ),
+                RoundAction(
+                  icon: Icons.chevron_right_rounded,
+                  label: 'Next',
+                  onPressed: live ? null : () => _showPly(ply + 1, game.moveCount),
+                ),
+                RoundAction(
+                  icon: Icons.last_page_rounded,
+                  label: 'Live',
+                  onPressed: live ? null : () => _showPly(game.moveCount, game.moveCount),
+                ),
+                RoundAction(
+                  icon: Icons.history_rounded,
+                  label: 'Moves',
+                  highlighted: true,
+                  onPressed: () => setState(() {
+                    _showMoves = false;
+                    _reviewPly = null;
+                  }),
+                ),
+              ]
+            : finished
+            ? [
+                RoundAction(
+                  icon: Icons.info_outline_rounded,
+                  label: 'Result',
+                  onPressed: _showResult,
+                ),
+                RoundAction(
+                  icon: Icons.history_rounded,
+                  label: 'Moves',
+                  onPressed: () => setState(() => _showMoves = true),
+                ),
+                RoundAction(
+                  icon: Icons.biotech_outlined,
+                  label: 'Analysis',
+                  onPressed: () => _openAnalysis(state),
+                ),
+                RoundAction(icon: Icons.refresh_rounded, label: 'New game', onPressed: newGame),
+              ]
+            : [
+                RoundAction(
+                  icon: Icons.undo_rounded,
+                  label: 'Undo',
+                  onPressed: live && game.moveCount > 0 && !state.botThinking
+                      ? controller.undo
+                      : null,
+                ),
+                RoundAction(
+                  icon: Icons.arrow_forward_rounded,
+                  label: 'Pass',
+                  onPressed: live && state.canPlay ? controller.pass : null,
+                ),
+                RoundAction(
+                  icon: Icons.history_rounded,
+                  label: 'Moves',
+                  onPressed: () => setState(() => _showMoves = true),
+                ),
+                RoundAction(
+                  icon: Icons.flag_outlined,
+                  label: 'Resign',
+                  onPressed: state.phase == OfflinePhase.playing
+                      ? () async {
+                          if (await confirm(context, title: 'Resign?', confirmLabel: 'Resign')) {
+                            controller.resign();
+                          }
+                        }
+                      : null,
+                ),
+              ],
+      );
+    }
+
+    return Scaffold(
+      appBar: TopBar(
+        title: title,
+        muted: true,
+        actions: [
+          CircleIconButton(icon: Icons.more_horiz_rounded, tooltip: 'Menu', onPressed: showMenu),
+        ],
       ),
       body: GameLayout(
-        moveList: MoveList(
-          moves: game.moves,
-          boardHeight: game.height,
-          selected: ply,
-          onSelect: (p) => _showPly(p, game.moveCount),
-        ),
-        topPlayer: bar(bottomColor.opposite),
-        bottomPlayer: bar(bottomColor),
+        above: above,
+        below: below,
         board: Goban(
           board: position.board,
           theme: prefs.boardTheme,
@@ -223,6 +351,7 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
           whiteStones: prefs.whiteStones,
           showCoordinates: prefs.showCoordinates,
           confirmMoves: prefs.confirmMoves,
+          sound: prefs.stoneSound,
           lastMove: position.lastMove?.point,
           toPlay: live && state.canPlay ? game.toMove : null,
           onPlay: (p) {
@@ -235,51 +364,7 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
               ? null
               : GobanTerritory(black: score.blackTerritory, white: score.whiteTerritory),
         ),
-        actions: [
-          GameAction(icon: Icons.menu, tooltip: 'Menu', onPressed: showMenu),
-          if (scoring) ...[
-            GameTextAction(
-              label: 'Resume',
-              icon: Icons.play_arrow_outlined,
-              onPressed: controller.resumePlay,
-            ),
-            GameTextAction(
-              label: 'Accept',
-              icon: Icons.check,
-              primary: true,
-              onPressed: controller.acceptScore,
-            ),
-          ] else ...[
-            if (finished)
-              GameAction(icon: Icons.info_outline, tooltip: 'Result', onPressed: _showResult)
-            else ...[
-              GameAction(
-                icon: Icons.undo,
-                tooltip: 'Undo',
-                onPressed: live && game.moveCount > 0 && !state.botThinking
-                    ? controller.undo
-                    : null,
-              ),
-              GameAction(
-                icon: Icons.front_hand_outlined,
-                tooltip: 'Pass',
-                onPressed: live && state.canPlay ? controller.pass : null,
-              ),
-            ],
-            GameAction(
-              icon: Icons.chevron_left,
-              tooltip: 'Previous move',
-              large: true,
-              onPressed: ply > 0 ? () => _showPly(ply - 1, game.moveCount) : null,
-            ),
-            GameAction(
-              icon: Icons.chevron_right,
-              tooltip: 'Next move',
-              large: true,
-              onPressed: live ? null : () => _showPly(ply + 1, game.moveCount),
-            ),
-          ],
-        ],
+        actions: actions,
       ),
     );
   }

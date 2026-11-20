@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/model/go/board.dart';
 import 'package:tengen/src/model/go/coordinates.dart';
 import 'package:tengen/src/model/go/game.dart';
+import 'package:tengen/src/model/go/scoring.dart';
 
 /// `Black to play`, or `Move 12 · White D4` / `Move 13 · Black passed`.
 String moveSummary(GoGame game) {
@@ -20,87 +21,50 @@ String moveSummary(GoGame game) {
   return 'Move ${game.moveCount} · $what';
 }
 
-/// An app bar title with a smaller line below, and an optional icon (as in the lichess app).
-class GameTitle extends StatelessWidget {
-  const GameTitle({required this.title, this.subtitle, this.icon, super.key});
-
-  final String title;
-  final String? subtitle;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        if (icon != null) ...[Icon(icon, size: 28), const SizedBox(width: 12)],
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(title, overflow: TextOverflow.ellipsis),
-              if (subtitle != null)
-                Text(
-                  subtitle!,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+/// `35 territory + 6 prisoners`, `28 territory + 30 stones + 6.5 komi`.
+String scoreDetail(SideScore side) {
+  String n(num v) => v == v.roundToDouble() ? '${v.toInt()}' : '$v';
+  return [
+    '${side.territory} territory',
+    if (side.stones > 0) '${side.stones} stones',
+    if (side.prisoners > 0) '${side.prisoners} ${side.prisoners == 1 ? 'prisoner' : 'prisoners'}',
+    if (side.handicap > 0) '${side.handicap} handicap',
+    if (side.komi != 0) '${n(side.komi)} komi',
+  ].join(' + ');
 }
 
-/// Lays out a game: a player bar on each side of the board and actions at the bottom.
+/// The height kept for the actions at the bottom of a game, whatever they are (round actions
+/// while playing, two large buttons when counting): the board must not move between phases.
+const kGameActionsHeight = 112.0;
+
+/// Lays out a game screen below its top bar: what goes above the board (the opponent, or a
+/// prompt), the board, what goes below (you, the score, the move list), and the actions.
 ///
-/// The player bars hug the board, and the group is centered in the space left by the actions.
-/// In landscape the player bars and actions go to the right of the board.
+/// The board is as large as the room left allows, and the block of the three is centered in
+/// the space above the actions. In landscape the board is on the left and the rest on the right.
 class GameLayout extends StatelessWidget {
   const GameLayout({
     required this.board,
-    required this.topPlayer,
-    required this.bottomPlayer,
+    required this.above,
+    required this.below,
     required this.actions,
-    this.moveList,
     super.key,
   });
 
-  /// The move list strip, shown at the top.
-  final Widget? moveList;
   final Widget board;
-  final Widget topPlayer;
-  final Widget bottomPlayer;
-  final List<Widget> actions;
+  final Widget above;
+  final Widget below;
+  final Widget actions;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final actionBar = DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.3))),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          // A fixed height, whatever the buttons (icons while playing, labels when counting):
-          // the board is centered in the room left, and must not move.
-          child: SizedBox(
-            height: 56,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [for (final a in actions) Flexible(child: a)],
-            ),
-          ),
-        ),
+    final actionArea = SafeArea(
+      top: false,
+      child: SizedBox(
+        height: kGameActionsHeight,
+        child: Center(child: actions),
       ),
     );
-    final paddedBoard = Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: board);
     return LayoutBuilder(
       builder: (context, constraints) {
         final landscape = constraints.maxWidth > constraints.maxHeight * 1.2;
@@ -109,19 +73,18 @@ class GameLayout extends StatelessWidget {
             bottom: false,
             child: Row(
               children: [
-                Expanded(flex: 3, child: Center(child: paddedBoard)),
+                Expanded(flex: 3, child: Center(child: board)),
                 Expanded(
                   flex: 2,
                   child: Column(
                     children: [
-                      ?moveList,
                       Expanded(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: [topPlayer, bottomPlayer],
+                          children: [above, const SizedBox(height: 12), below],
                         ),
                       ),
-                      actionBar,
+                      actionArea,
                     ],
                   ),
                 ),
@@ -131,21 +94,17 @@ class GameLayout extends StatelessWidget {
         }
         return Column(
           children: [
-            ?moveList,
             Expanded(
-              // The board takes all the room the players leave (see _GameAreaLayout). Messages
-              // never take space from it: they go in the title, the player rows, the action bar
-              // or a snack bar.
               child: CustomMultiChildLayout(
                 delegate: _GameAreaLayout(),
                 children: [
-                  LayoutId(id: _GameAreaLayout.top, child: topPlayer),
+                  LayoutId(id: _GameAreaLayout.top, child: above),
                   LayoutId(id: _GameAreaLayout.board, child: board),
-                  LayoutId(id: _GameAreaLayout.bottom, child: bottomPlayer),
+                  LayoutId(id: _GameAreaLayout.bottom, child: below),
                 ],
               ),
             ),
-            actionBar,
+            actionArea,
           ],
         );
       },
@@ -153,77 +112,183 @@ class GameLayout extends StatelessWidget {
   }
 }
 
-/// An icon button of the game action bar, with an optional badge (unread chat messages).
-class GameAction extends StatelessWidget {
-  const GameAction({
-    required this.icon,
-    required this.tooltip,
-    this.onPressed,
-    this.badge,
-    this.large = false,
-    super.key,
-  });
+/// Two large buttons side by side (`Resume play` / `Accept`), for the end of a game.
+class GameButtons extends StatelessWidget {
+  const GameButtons({required this.secondary, required this.primary, super.key});
+
+  final Widget secondary;
+  final Widget primary;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: Row(
+      children: [
+        Expanded(child: secondary),
+        const SizedBox(width: 14),
+        Expanded(child: primary),
+      ],
+    ),
+  );
+}
+
+/// A prompt above the board (`Both passed. Tap the dead stones, then Accept.`).
+class GamePrompt extends StatelessWidget {
+  const GamePrompt({required this.icon, required this.text, super.key});
 
   final IconData icon;
-  final String tooltip;
-  final VoidCallback? onPressed;
-  final int? badge;
-
-  /// Larger icon, for the move navigation arrows.
-  final bool large;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    final count = badge;
-    return IconButton(
-      tooltip: tooltip,
-      onPressed: onPressed,
-      iconSize: large ? 34 : 28,
-      padding: const EdgeInsets.all(10),
-      icon: count != null && count > 0
-          ? Badge(label: Text(count > 99 ? '99+' : '$count'), child: Icon(icon))
-          : Icon(icon),
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: scheme.primary, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                text,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: scheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-/// A labelled button of the game action bar, for phase actions (accept the score, new game).
-class GameTextAction extends StatelessWidget {
-  const GameTextAction({
-    required this.label,
-    required this.onPressed,
-    this.icon,
-    this.primary = false,
-    super.key,
+/// One line of a [ScoreCard].
+@immutable
+class ScoreLine {
+  const ScoreLine({
+    required this.color,
+    required this.name,
+    required this.detail,
+    required this.total,
   });
 
-  final String label;
-  final IconData? icon;
-  final VoidCallback? onPressed;
-  final bool primary;
+  final StoneColor color;
+  final String name;
+
+  /// `35 territory + 6 prisoners`
+  final String detail;
+  final double total;
+}
+
+/// The score when counting: each player's points, then who wins.
+class ScoreCard extends StatelessWidget {
+  const ScoreCard({required this.lines, required this.verdict, required this.result, super.key});
+
+  final List<ScoreLine> lines;
+
+  /// `You win by 4.5`
+  final String verdict;
+
+  /// `B+4.5`
+  final String result;
 
   @override
   Widget build(BuildContext context) {
-    final child = FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[Icon(icon, size: 20), const SizedBox(width: 6)],
-          Text(label, maxLines: 1),
-        ],
-      ),
-    );
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final best = lines.map((l) => l.total).fold<double>(double.negativeInfinity, math.max);
+    String points(double v) => v == v.roundToDouble() ? '${v.toInt()}' : '$v';
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-      child: SizedBox(
-        height: 44,
-        child: primary
-            ? FilledButton(onPressed: onPressed, child: child)
-            : FilledButton.tonal(onPressed: onPressed, child: child),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final line in lines)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    _Stone(line.color, size: 20),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 64,
+                      child: Text(
+                        line.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        line.detail,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                    ),
+                    Text(
+                      points(line.total),
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: line.total == best ? scheme.onSurface : scheme.onSurfaceVariant,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Divider(height: 24, color: scheme.outlineVariant),
+            Row(
+              children: [
+                Expanded(child: Text(verdict, style: theme.textTheme.headlineSmall)),
+                Text(
+                  result,
+                  style: theme.textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
+}
+
+class _Stone extends StatelessWidget {
+  const _Stone(this.color, {required this.size});
+
+  final StoneColor color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      gradient: RadialGradient(
+        center: const Alignment(-0.35, -0.4),
+        colors: color == StoneColor.black
+            ? const [Color(0xFF5A5A5A), Color(0xFF111111)]
+            : const [Color(0xFFFFFFFF), Color(0xFFC8C8C8)],
+      ),
+    ),
+  );
 }
 
 /// Lays out the players and the board, top to bottom: the board is as large as the room the
@@ -243,8 +308,7 @@ class _GameAreaLayout extends MultiChildLayoutDelegate {
     final room = (size.height - gap * 2 - topHeight - bottomHeight).clamp(0.0, size.height);
     final boardSize = layoutChild(board, BoxConstraints(maxWidth: size.width, maxHeight: room));
 
-    // The players and the board as one block, centered: the space they leave is shared evenly
-    // above and below, as in the chess.com app, rather than all left under the bottom player.
+    // The block of the three is centered: the space it leaves is shared evenly above and below.
     final block = topHeight + boardSize.height + bottomHeight;
     var y = math.max(gap, (size.height - block) / 2);
     positionChild(top, Offset(0, y));

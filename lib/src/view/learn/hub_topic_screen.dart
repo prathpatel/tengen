@@ -12,8 +12,8 @@ import 'package:tengen/src/model/puzzle/puzzle.dart';
 import 'package:tengen/src/model/puzzle/tree_solver.dart';
 import 'package:tengen/src/model/settings/preferences.dart';
 import 'package:tengen/src/utils/navigation.dart';
-import 'package:tengen/src/widgets/game_layout.dart';
 import 'package:tengen/src/widgets/goban.dart';
+import 'package:tengen/src/widgets/ui.dart';
 
 /// How long the opponent waits before answering on a Learning Hub page.
 final hubReplyDelayProvider = Provider<Duration>((ref) => const Duration(milliseconds: 500));
@@ -50,6 +50,9 @@ class _HubTopicScreenState extends ConsumerState<HubTopicScreen> {
   bool _replying = false;
   Timer? _replyTimer;
 
+  /// The hint shown: the moves to try.
+  Set<Point>? _hint;
+
   @override
   void dispose() {
     _replyTimer?.cancel();
@@ -64,6 +67,7 @@ class _HubTopicScreenState extends ConsumerState<HubTopicScreen> {
       _chosen = null;
       _removed = {};
       _replying = false;
+      _hint = null;
     });
   }
 
@@ -96,7 +100,10 @@ class _HubTopicScreenState extends ConsumerState<HubTopicScreen> {
       showSnack(context, e.message);
       return;
     }
-    setState(() => _solver = next);
+    setState(() {
+      _solver = next;
+      _hint = null;
+    });
     if (next.status != PuzzleStatus.solving) {
       _finish(topic, next.status);
       return;
@@ -137,9 +144,9 @@ class _HubTopicScreenState extends ConsumerState<HubTopicScreen> {
     final scheme = theme.colorScheme;
     final topic = hub?.topics.where((t) => t.id == _topicId).firstOrNull;
     if (hub == null || topic == null) {
-      return Scaffold(
-        appBar: AppBar(),
-        body: const Center(child: CircularProgressIndicator()),
+      return const Scaffold(
+        appBar: TopBar(),
+        body: Center(child: CircularProgressIndicator()),
       );
     }
     final page = topic.pages[_page.clamp(0, topic.pages.length - 1)];
@@ -166,139 +173,142 @@ class _HubTopicScreenState extends ConsumerState<HubTopicScreen> {
         _status == PuzzleStatus.solving &&
         !_replying;
 
-    final (Color bg, Color fg) = switch (_status) {
-      PuzzleStatus.correct => (Colors.green.shade700, Colors.white),
-      PuzzleStatus.wrong => (scheme.errorContainer, scheme.onErrorContainer),
-      PuzzleStatus.solving => (scheme.surfaceContainerHigh, scheme.onSurface),
+    final hint = _hint;
+    final nextLabel = !isLastPage ? 'Next page' : (nextTopic == null ? 'Done' : 'Next lesson');
+
+    // The result, or a hint, under the board.
+    final Widget? card = switch (_status) {
+      PuzzleStatus.correct => _ResultCard(
+        icon: Icons.check_rounded,
+        title: 'Great job!',
+        color: scheme.secondary,
+        background: scheme.secondaryContainer,
+      ),
+      PuzzleStatus.wrong => _ResultCard(
+        icon: Icons.close_rounded,
+        title: 'Not quite',
+        text: 'Start the page again with the retry button.',
+        color: scheme.error,
+        background: scheme.errorContainer,
+      ),
+      PuzzleStatus.solving when hint != null => _ResultCard(
+        icon: Icons.lightbulb_outline_rounded,
+        title: hint.isEmpty
+            ? 'No hint here'
+            : 'Hint: try ${hint.map((p) => prettyCoordinate(p, page.board.height)).join(' or ')}',
+        text: hint
+            .map((p) => (_solver?.node ?? page.moveTree)?.branchAt(p)?.text)
+            .nonNulls
+            .firstOrNull,
+        color: scheme.primary,
+        background: scheme.surfaceContainer,
+        outlined: true,
+      ),
+      _ => null,
     };
 
-    final instruction = Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(16)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (_status == PuzzleStatus.correct)
-            Row(
-              children: [
-                Icon(Icons.check_circle, color: fg),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Great job!',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: fg,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.green.shade800,
-                  ),
-                  onPressed: next,
-                  child: Text(isLastPage && nextTopic == null ? 'Done' : 'Next'),
-                ),
-              ],
-            )
-          else if (_status == PuzzleStatus.wrong)
-            Row(
-              children: [
-                Icon(Icons.cancel, color: fg),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Puzzle failed!',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: fg,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                FilledButton(onPressed: _reset, child: const Text('Retry')),
-              ],
-            )
-          else ...[
-            Text(
-              choice?.question ?? page.text ?? '',
-              style: theme.textTheme.bodyLarge?.copyWith(color: fg),
-            ),
-            if (special case HubButton(:final label))
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: FilledButton(
-                  onPressed: () => _finish(topic, PuzzleStatus.correct),
-                  child: Text(label),
-                ),
-              ),
-          ],
-        ],
-      ),
-    );
-
+    final pages = topic.pages.length;
     return Scaffold(
-      appBar: AppBar(
-        title: GameTitle(
-          icon: Icons.school_outlined,
-          title: '${topic.number} ${topic.title}',
-          subtitle: 'Page ${_page + 1} of ${topic.pages.length}',
-        ),
-      ),
       body: SafeArea(
-        top: false,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox(
-              height: 44,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                itemCount: topic.pages.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 6),
-                itemBuilder: (context, i) {
-                  final isDone = done.contains(HubProgressController.key(topic, i));
-                  final current = i == _page;
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: () => current ? _reset() : _goTo(topic.id, i),
-                    child: Container(
-                      width: 32,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: current
-                            ? scheme.primary
-                            : (isDone ? scheme.primaryContainer : scheme.surfaceContainerHigh),
-                      ),
-                      child: isDone && !current
-                          ? Icon(Icons.star_rounded, size: 18, color: scheme.onPrimaryContainer)
-                          : Text(
-                              '${i + 1}',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: current ? scheme.onPrimary : null,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 20, 0),
+              child: Row(
+                children: [
+                  const CircleBackButton(icon: Icons.close_rounded),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                topic.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleSmall,
                               ),
                             ),
+                            Text(
+                              'Page ${_page + 1} of $pages',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        // One segment per page: done and current ones in the accent.
+                        Row(
+                          children: [
+                            for (var i = 0; i < pages; i++) ...[
+                              if (i > 0) SizedBox(width: pages > 12 ? 3 : 5),
+                              Expanded(
+                                child: Semantics(
+                                  button: true,
+                                  label: 'Page ${i + 1}',
+                                  child: GestureDetector(
+                                    onTap: () => i == _page ? _reset() : _goTo(topic.id, i),
+                                    child: Container(
+                                      height: 6,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(3),
+                                        color:
+                                            i == _page ||
+                                                done.contains(HubProgressController.key(topic, i))
+                                            ? scheme.primary
+                                            : scheme.surfaceContainerHighest,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
                     ),
-                  );
-                },
+                  ),
+                ],
               ),
             ),
-            instruction,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(22, 22, 22, 16),
+              child: Text(
+                choice?.question ?? page.text ?? '',
+                style: theme.textTheme.titleLarge?.copyWith(height: 1.3, fontSize: 22),
+              ),
+            ),
+            if (special case HubButton(:final label) when _status == PuzzleStatus.solving)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 0, 22, 14),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton(
+                    onPressed: () => _finish(topic, PuzzleStatus.correct),
+                    child: Text(label),
+                  ),
+                ),
+              ),
             Expanded(
               child: Center(
                 child: Goban(
                   board: board,
                   viewport: vp == null ? null : GobanViewport(vp.left, vp.top, vp.right, vp.bottom),
-                  marks: (solver?.game.moveCount ?? 0) == 0
-                      ? {for (final e in page.marks.entries) e.key: _mark(e.value)}
-                      : const {},
+                  marks: {
+                    if ((solver?.game.moveCount ?? 0) == 0)
+                      for (final e in page.marks.entries) e.key: _mark(e.value),
+                    for (final p in hint ?? const <Point>{}) p: const ShapeMark(ShapeKind.circle),
+                  },
                   theme: prefs.boardTheme,
                   blackStones: prefs.blackStones,
                   whiteStones: prefs.whiteStones,
                   showCoordinates: prefs.showCoordinates,
+                  sound: prefs.stoneSound,
                   lastMove: solver?.game.position.lastMove?.point,
                   toPlay: canPlay ? (solver?.game.toMove ?? page.toPlay) : null,
                   onPlay: (p) => _play(topic, page, p),
@@ -311,34 +321,34 @@ class _HubTopicScreenState extends ConsumerState<HubTopicScreen> {
             ),
             if (choice != null)
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: Row(
                   children: [
                     for (final (i, option) in choice.options.indexed) ...[
-                      if (i > 0) const SizedBox(width: 8),
+                      if (i > 0) const SizedBox(width: 10),
                       Expanded(
-                        child: SizedBox(
-                          height: 52,
-                          child: FilledButton.tonal(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: _chosen == option.value
-                                  ? (option.value == choice.correct
-                                        ? Colors.green.shade700
-                                        : scheme.error)
-                                  : scheme.surfaceContainerHigh,
-                              foregroundColor: _chosen == option.value
-                                  ? Colors.white
-                                  : scheme.onSurface,
-                              textStyle: theme.textTheme.titleMedium,
-                              padding: const EdgeInsets.symmetric(horizontal: 6),
-                            ),
-                            onPressed: _status == PuzzleStatus.solving
-                                ? () => _choose(topic, choice, option.value)
-                                : null,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(option.label, maxLines: 1),
-                            ),
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: _chosen == option.value
+                                ? (option.value == choice.correct ? scheme.secondary : scheme.error)
+                                : scheme.surfaceContainer,
+                            foregroundColor: _chosen == option.value
+                                ? scheme.onSecondary
+                                : scheme.onSurface,
+                            disabledBackgroundColor: _chosen == option.value
+                                ? (option.value == choice.correct ? scheme.secondary : scheme.error)
+                                : scheme.surfaceContainer,
+                            disabledForegroundColor: _chosen == option.value
+                                ? scheme.onSecondary
+                                : scheme.onSurfaceVariant,
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                          ),
+                          onPressed: _status == PuzzleStatus.solving
+                              ? () => _choose(topic, choice, option.value)
+                              : null,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(option.label, maxLines: 1),
                           ),
                         ),
                       ),
@@ -346,54 +356,132 @@ class _HubTopicScreenState extends ConsumerState<HubTopicScreen> {
                   ],
                 ),
               ),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.3)),
-                ),
+            ?card,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+              child: Row(
+                children: [
+                  Tooltip(
+                    message: 'Start the page again',
+                    child: Material(
+                      color: scheme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(18),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(18),
+                        onTap: _reset,
+                        child: const SizedBox.square(
+                          dimension: 56,
+                          child: Icon(Icons.refresh_rounded),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: _status == PuzzleStatus.correct
+                        ? FilledButton(
+                            onPressed: next,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(nextLabel),
+                                const SizedBox(width: 6),
+                                const Icon(Icons.chevron_right_rounded),
+                              ],
+                            ),
+                          )
+                        : page.moveTree != null && special is! HubButton
+                        ? FilledButton(
+                            style: softButtonStyle(context),
+                            onPressed: canPlay
+                                ? () {
+                                    final s =
+                                        _solver ??
+                                        TreeSolver.start(page.board, page.toPlay, page.moveTree!);
+                                    setState(() => _hint = hint == null ? s.hint() : null);
+                                  }
+                                : null,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.lightbulb_outline_rounded),
+                                const SizedBox(width: 8),
+                                Text(hint == null ? 'Hint' : 'Hide hint'),
+                              ],
+                            ),
+                          )
+                        : FilledButton(
+                            style: softButtonStyle(context),
+                            onPressed: isLastPage && nextTopic == null ? null : next,
+                            child: const Text('Skip page'),
+                          ),
+                  ),
+                ],
               ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    GameAction(
-                      icon: Icons.refresh,
-                      tooltip: 'Start the page again',
-                      onPressed: _reset,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The result of a page, or a hint.
+class _ResultCard extends StatelessWidget {
+  const _ResultCard({
+    required this.icon,
+    required this.title,
+    required this.color,
+    required this.background,
+    this.text,
+    this.outlined = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? text;
+  final Color color;
+  final Color background;
+  final bool outlined;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: outlined ? color : color.withValues(alpha: 0.35), width: 1.5),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              child: Icon(icon, color: background, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                // Its own height: under the board, the card must not take the board's room.
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(title, style: theme.textTheme.titleMedium?.copyWith(color: color)),
+                  if (text != null)
+                    Text(
+                      text!,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                    GameAction(
-                      icon: Icons.lightbulb_outline,
-                      tooltip: 'Hint',
-                      onPressed: page.moveTree != null && canPlay
-                          ? () {
-                              final s =
-                                  _solver ??
-                                  TreeSolver.start(page.board, page.toPlay, page.moveTree!);
-                              final hint = s.hint();
-                              showSnack(
-                                context,
-                                hint.isEmpty
-                                    ? 'No hint here'
-                                    : 'Try ${hint.map((p) => prettyCoordinate(p, page.board.height)).join(' or ')}',
-                              );
-                            }
-                          : null,
-                    ),
-                    GameAction(
-                      icon: Icons.chevron_left,
-                      tooltip: 'Previous page',
-                      large: true,
-                      onPressed: _page > 0 ? () => _goTo(topic.id, _page - 1) : null,
-                    ),
-                    GameAction(
-                      icon: Icons.chevron_right,
-                      tooltip: 'Next page',
-                      large: true,
-                      onPressed: isLastPage && nextTopic == null ? null : next,
-                    ),
-                  ],
-                ),
+                ],
               ),
             ),
           ],

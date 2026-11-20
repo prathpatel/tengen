@@ -41,48 +41,44 @@ class StoneIcon extends StatelessWidget {
   );
 }
 
-/// A player above or below the board, as in the lichess app: a stone for the player's color,
-/// name and rank, captures below, and the clock (or turn indicator) on the right.
-class PlayerBar extends StatelessWidget {
-  const PlayerBar({
+/// A player above or below the board, in a rounded pill: the opponent on the left above the
+/// board, you on the right below it. The player to move is outlined in the accent color.
+class PlayerPill extends StatelessWidget {
+  const PlayerPill({
     required this.color,
     required this.name,
-    required this.captures,
     required this.active,
     this.rank,
-    this.isBot = false,
-    this.komi,
-    this.clock,
-    this.thinking = false,
+    this.detail,
     this.note,
+    this.clock,
+    this.isBot = false,
+    this.thinking = false,
+    this.end = false,
     this.onTap,
     super.key,
   });
 
   final StoneColor color;
   final String name;
+  final String? rank;
 
-  /// A short status shown after the captures, e.g. `Passed`.
+  /// The line below the name: `3 captures`, `Your move · 2 captures`.
+  final String? detail;
+
+  /// A short status in the accent, e.g. `Passed`.
   final String? note;
 
-  /// Rank label, e.g. `3k`.
-  final String? rank;
-  final bool isBot;
-
-  /// Stones of the opponent captured by this player.
-  final int captures;
-
-  /// Komi, shown for white.
-  final double? komi;
-
-  /// Whether it is this player's turn.
-  final bool active;
-
-  /// The clock, for online games. Without a clock, the player to move gets a "To play" tag.
+  /// The clock, for online games.
   final Widget? clock;
+  final bool active;
+  final bool isBot;
 
   /// Shows that the computer is choosing its move.
   final bool thinking;
+
+  /// Aligned to the right, with the stone last (you, below the board).
+  final bool end;
   final VoidCallback? onTap;
 
   @override
@@ -90,119 +86,103 @@ class PlayerBar extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final muted = theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
-
-    final Widget? trailing =
-        clock ??
-        (thinking
-            ? Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  const SizedBox(width: 8),
-                  Text('Thinking…', style: muted),
-                ],
-              )
-            : active
-            ? Text(
-                'To play',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: scheme.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              )
-            : null);
-
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-        child: Row(
+    final text = Column(
+      crossAxisAlignment: end ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      StoneIcon(color, size: 16),
-                      const SizedBox(width: 8),
-                      if (isBot) ...[
-                        Icon(Icons.smart_toy_outlined, size: 18, color: scheme.onSurfaceVariant),
-                        const SizedBox(width: 4),
-                      ],
-                      Flexible(
-                        child: Text(
-                          name,
-                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (rank != null && rank!.isNotEmpty) ...[
-                        const SizedBox(width: 8),
-                        Text(rank!, style: muted),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Tooltip(
-                    message: '$captures ${captures == 1 ? 'capture' : 'captures'}',
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 2),
-                        StoneIcon(color.opposite, size: 11),
-                        const SizedBox(width: 5),
-                        Flexible(
-                          child: Text(
-                            [
-                              if (captures == 0) 'no captures' else '+$captures',
-                              if (komi != null) 'komi ${_formatKomi(komi!)}',
-                            ].join('  ·  '),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                        if (note != null) ...[
-                          const SizedBox(width: 8),
-                          // Same text style as the line, and no vertical padding: the tag
-                          // must not change the row height (it would move the board).
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6),
-                            decoration: BoxDecoration(
-                              color: scheme.tertiaryContainer,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              note!,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: scheme.onTertiaryContainer,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
+            if (isBot) ...[
+              Icon(Icons.smart_toy_outlined, size: 17, color: scheme.onSurfaceVariant),
+              const SizedBox(width: 4),
+            ],
+            Flexible(
+              child: Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium,
               ),
             ),
-            ?trailing,
+            if (rank != null && rank!.isNotEmpty) ...[
+              const SizedBox(width: 6),
+              Text(
+                rank!,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ],
         ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (thinking) ...[
+              const SizedBox.square(
+                dimension: 12,
+                child: CircularProgressIndicator(strokeWidth: 1.6),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Flexible(
+              child: Text(
+                [if (thinking) 'Thinking…', ?detail].join(' · '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: muted,
+              ),
+            ),
+            if (note != null) ...[
+              const SizedBox(width: 8),
+              Text(
+                note!,
+                style: muted?.copyWith(color: scheme.primary, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+    final children = <Widget>[
+      StoneIcon(color, size: 34),
+      const SizedBox(width: 12),
+      Flexible(child: text),
+      if (clock != null) ...[const SizedBox(width: 16), clock!],
+    ];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      // A row rather than an Align: the pill must keep its own height (the board takes the rest).
+      child: Row(
+        mainAxisAlignment: end ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: [
+          Flexible(
+            child: Material(
+              color: scheme.surfaceContainer,
+              shape: StadiumBorder(
+                side: active
+                    ? BorderSide(color: scheme.primary, width: 2)
+                    : const BorderSide(color: Colors.transparent, width: 2),
+              ),
+              child: InkWell(
+                customBorder: const StadiumBorder(),
+                onTap: onTap,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(end ? 18 : 8, 8, end ? 8 : 18, 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: end ? children.reversed.toList() : children,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
-
-  static String _formatKomi(double komi) =>
-      komi == komi.roundToDouble() ? '${komi.toInt()}' : '$komi';
 }
 
 /// Displays an OGS game clock, ticking for the player to move.
@@ -261,24 +241,13 @@ class _OgsClockDisplayState extends State<OgsClockDisplay> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final low = _running && reading.critical < const Duration(seconds: 10);
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-      decoration: BoxDecoration(
-        color: low
-            ? scheme.errorContainer
-            : (_running ? scheme.surfaceContainerHighest : Colors.transparent),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        reading.label,
-        style: theme.textTheme.headlineSmall?.copyWith(
-          color: low
-              ? scheme.onErrorContainer
-              : (_running ? scheme.onSurface : scheme.onSurfaceVariant.withValues(alpha: 0.7)),
-          fontFeatures: const [FontFeature.tabularFigures()],
-          fontWeight: _running ? FontWeight.w600 : FontWeight.w400,
-        ),
+    return Text(
+      reading.label,
+      style: theme.textTheme.titleLarge?.copyWith(
+        fontSize: 20,
+        color: low ? scheme.error : (_running ? scheme.onSurface : scheme.onSurfaceVariant),
+        fontFeatures: const [FontFeature.tabularFigures()],
+        fontWeight: FontWeight.w600,
       ),
     );
   }

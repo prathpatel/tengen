@@ -30,7 +30,7 @@ void main() {
     }
 
     expect(shown()[const Point(6, 6)], StoneColor.white);
-    await tester.tap(find.byTooltip('Previous move'));
+    await tester.tap(find.byTooltip('Previous'));
     await tester.pump();
     expect(shown()[const Point(6, 6)], isNull);
 
@@ -43,7 +43,7 @@ void main() {
     await tester.tap(find.byTooltip('Back to the game'));
     await tester.pump();
     expect(find.text('Variation from move 2'), findsNothing);
-    await tester.tap(find.byTooltip('Next move'));
+    await tester.tap(find.byTooltip('Next'));
     await tester.pump();
     expect(shown()[const Point(6, 6)], StoneColor.white);
     expect(shown()[const Point(4, 4)], isNull);

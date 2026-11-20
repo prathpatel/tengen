@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/model/ogs/chat_rooms.dart';
 import 'package:tengen/src/utils/navigation.dart';
 import 'package:tengen/src/view/chat/chat_room_screen.dart';
+import 'package:tengen/src/widgets/ui.dart';
 
 /// The public chat rooms of online-go.com.
 class ChatRoomsScreen extends StatelessWidget {
@@ -11,7 +12,7 @@ class ChatRoomsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Chat rooms')),
+      appBar: const TopBar(title: 'Chat rooms'),
       body: ListView.separated(
         itemCount: globalChatRooms.length,
         separatorBuilder: (_, _) => const Divider(height: 1, indent: 72),

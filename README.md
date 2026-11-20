@@ -20,6 +20,9 @@ This is an unofficial client, not affiliated with OGS or Lichess.
 
 ## Features
 
+- **Design**: the app's colors follow the board (gold on Kaya, terracotta on Black Walnut, teal
+  on Granite…), as in the lichess app; a home hub with your current game, Play now, and Puzzles,
+  Learn, Watch and My games in sheets over the board; Inter font; OGS stone sounds.
 - **Play the computer** on OGS: the bots online on online-go.com (KataGo, including its human-like
   versions from 15k to 1d, GnuGo, Fuego and others), grouped by strength, with the settings each
   bot accepts checked as the OGS website does.

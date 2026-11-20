@@ -9,8 +9,10 @@ import 'package:tengen/src/utils/navigation.dart';
 import 'package:tengen/src/view/auth/sign_in_screen.dart';
 import 'package:tengen/src/view/offline_game/offline_game_screen.dart';
 import 'package:tengen/src/view/online_game/online_game_screen.dart';
+import 'package:tengen/src/view/play/play_screen.dart';
 import 'package:tengen/src/widgets/form_layout.dart';
 import 'package:tengen/src/widgets/segmented_choice.dart';
+import 'package:tengen/src/widgets/ui.dart';
 
 /// A game against one of the bots of OGS (KataGo, GnuGo, Fuego…), as the "Play computer" dialog
 /// of the OGS website: the settings, then the bots that accept them, by strength.
@@ -69,25 +71,44 @@ class _PlayBotTabState extends ConsumerState<PlayBotTab> {
                 dimension: 18,
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
-              label: Text('Waiting for ${challenge.bot.username}… Cancel', maxLines: 1),
+              label: Text('Waiting for ${challenge.opponent}… Cancel', maxLines: 1),
             )
           : FilledButton.icon(
               onPressed: selected == null
                   ? null
                   : () => ref.read(botChallengeProvider.notifier).challenge(selected, options),
-              icon: const Icon(Icons.smart_toy_outlined),
+              icon: const Icon(Icons.play_arrow_rounded),
               label: Text(
-                selected == null ? 'Choose a computer opponent' : 'Play ${selected.username}',
+                selected == null
+                    ? 'Choose a computer opponent'
+                    : 'Play ${selected.username} · ${selected.rankLabel}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
       children: [
-        LabeledField(
-          'Board size',
-          boardSizeSelector(settings.size, (v) => update(settings.copyWith(size: v))),
+        SideBySide(
+          left: (
+            'Board',
+            SegmentedChoice<int>(
+              choices: const [Choice(9, '9'), Choice(13, '13'), Choice(19, '19')],
+              selected: settings.size,
+              onChanged: (v) => update(settings.copyWith(size: v)),
+            ),
+          ),
+          right: (
+            'Clock',
+            SegmentedChoice<ClockSystem>(
+              choices: const [
+                Choice(ClockSystem.fischer, 'Fischer'),
+                Choice(ClockSystem.byoyomi, 'Byo'),
+              ],
+              selected: settings.system,
+              onChanged: (v) => update(settings.copyWith(system: v)),
+            ),
+          ),
         ),
-        LabeledField(
+        setting(
           'Time',
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -98,14 +119,8 @@ class _PlayBotTabState extends ConsumerState<PlayBotTab> {
                 onChanged: (v) => update(settings.copyWith(speed: v)),
               ),
               const SizedBox(height: 8),
-              SegmentedChoice<ClockSystem>(
-                choices: [for (final s in ClockSystem.values) Choice(s, s.label)],
-                selected: settings.system,
-                onChanged: (v) => update(settings.copyWith(system: v)),
-              ),
-              const SizedBox(height: 6),
               Text(
-                '${quickMatchTime(settings.size, settings.speed, settings.system)}  ·  '
+                '${quickMatchTime(settings.size, settings.speed, settings.system)} · '
                 '${settings.speed.estimate(settings.size)}',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
@@ -114,17 +129,29 @@ class _PlayBotTabState extends ConsumerState<PlayBotTab> {
             ],
           ),
         ),
-        SwitchListTile(
-          title: const Text('Rated'),
-          subtitle: const Text('Counts for your OGS rank'),
-          value: settings.ranked,
-          onChanged: (v) => update(settings.copyWith(ranked: v)),
-        ),
-        SwitchListTile(
-          title: const Text('Handicap'),
-          subtitle: const Text('Stones for the weaker player, from the ranks'),
-          value: settings.handicap,
-          onChanged: (v) => update(settings.copyWith(handicap: v)),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: _ToggleCard(
+                  title: 'Rated',
+                  subtitle: 'Counts for rank',
+                  value: settings.ranked,
+                  onChanged: (v) => update(settings.copyWith(ranked: v)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _ToggleCard(
+                  title: 'Handicap',
+                  subtitle: 'From the ranks',
+                  value: settings.handicap,
+                  onChanged: (v) => update(settings.copyWith(handicap: v)),
+                ),
+              ),
+            ],
+          ),
         ),
         switch (bots) {
           AsyncData() when list.isEmpty => const _Message(
@@ -154,6 +181,52 @@ class _PlayBotTabState extends ConsumerState<PlayBotTab> {
   }
 }
 
+class _ToggleCard extends StatelessWidget {
+  const _ToggleCard({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return MergeSemantics(
+      child: SoftCard(
+        padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+        onTap: () => onChanged(!value),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: theme.textTheme.titleMedium),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Switch(value: value, onChanged: onChanged),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _BotList extends StatelessWidget {
   const _BotList({
     required this.category,
@@ -175,13 +248,11 @@ class _BotList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final group = bots.where((b) => b.category == category).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        LabeledField(
+        setting(
           'Opponent',
           SegmentedChoice<BotCategory>(
             choices: [for (final c in BotCategory.values) Choice(c, c.label)],
@@ -193,19 +264,17 @@ class _BotList extends StatelessWidget {
           const _Message(icon: Icons.smart_toy_outlined, text: 'No bots of this strength online.')
         else
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-            child: Material(
-              color: scheme.surfaceContainer,
-              borderRadius: BorderRadius.circular(16),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: [
-                  // Bots that can play these settings first, weakest first.
-                  for (final bot in [
-                    ...group.where((b) => verdicts[b.id]!.clock != null),
-                    ...group.where((b) => verdicts[b.id]!.clock == null),
-                  ])
-                    _BotRow(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+            child: Column(
+              children: [
+                // Bots that can play these settings first, weakest first.
+                for (final bot in [
+                  ...group.where((b) => verdicts[b.id]!.clock != null),
+                  ...group.where((b) => verdicts[b.id]!.clock == null),
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _BotRow(
                       bot: bot,
                       problem: verdicts[bot.id]!.problem,
                       selected: bot == selected,
@@ -213,8 +282,8 @@ class _BotList extends StatelessWidget {
                           ? () => onSelect(bot)
                           : null,
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
       ],
@@ -240,51 +309,72 @@ class _BotRow extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final available = problem == null;
-    return Opacity(
-      opacity: available ? 1 : 0.5,
-      child: ListTile(
-        onTap: onTap,
-        selected: selected,
-        selectedTileColor: scheme.primaryContainer,
-        selectedColor: scheme.onPrimaryContainer,
-        leading: CircleAvatar(
-          backgroundColor: scheme.surfaceContainerHighest,
-          foregroundImage: bot.iconUrl == null ? null : NetworkImage(bot.iconUrl!),
-          // The robot icon stays when the picture cannot load.
-          onForegroundImageError: bot.iconUrl == null ? null : (_, _) {},
-          child: const Icon(Icons.smart_toy_outlined, size: 20),
-        ),
-        title: Row(
-          children: [
-            Flexible(child: Text(bot.username, overflow: TextOverflow.ellipsis)),
-            const SizedBox(width: 8),
-            Text(
-              bot.rankLabel,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
-              ),
-            ),
-            if (bot.isKataGo) ...[
-              const SizedBox(width: 8),
+    final lower = bot.username.toLowerCase();
+    // What the name tells of the engine; nothing is made up for the others.
+    final engine = bot.isKataGo
+        ? (lower.contains('humanlike') ? 'KataGo · plays like a person of its rank' : 'KataGo')
+        : null;
+    return Semantics(
+      button: true,
+      selected: selected,
+      enabled: available,
+      child: Opacity(
+        opacity: available ? 1 : 0.45,
+        child: SoftCard(
+          selected: selected,
+          onTap: onTap,
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          child: Row(
+            children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                width: 46,
+                height: 46,
                 decoration: BoxDecoration(
-                  color: scheme.tertiaryContainer,
-                  borderRadius: BorderRadius.circular(6),
+                  color: scheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: Text(
-                  'KataGo',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.onTertiaryContainer,
-                    fontWeight: FontWeight.w700,
-                  ),
+                clipBehavior: Clip.antiAlias,
+                child: bot.iconUrl == null
+                    ? Icon(Icons.smart_toy_outlined, color: scheme.primary)
+                    : Image.network(
+                        bot.iconUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            Icon(Icons.smart_toy_outlined, color: scheme.primary),
+                      ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      bot.username,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    if (problem != null || engine != null)
+                      Text(
+                        problem ?? engine!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: problem != null ? scheme.primary : scheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
                 ),
+              ),
+              const SizedBox(width: 10),
+              Tag(
+                bot.rankLabel,
+                background: selected ? scheme.primary : null,
+                foreground: selected ? scheme.onPrimary : null,
               ),
             ],
-          ],
+          ),
         ),
-        subtitle: available ? null : Text(problem!),
-        trailing: selected ? const Icon(Icons.check_circle) : null,
       ),
     );
   }

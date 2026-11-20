@@ -151,6 +151,7 @@ class Preferences {
     this.whiteStones = StoneTheme.shell,
     this.showCoordinates = true,
     this.confirmMoves = true,
+    this.stoneSound = true,
     this.themeMode = AppThemeMode.system,
   });
 
@@ -163,6 +164,9 @@ class Preferences {
 
   /// Requires a second tap on the same point to place a stone, to avoid misclicks on phones.
   final bool confirmMoves;
+
+  /// The click of a stone on the board, with each move (the OGS stone sounds).
+  final bool stoneSound;
   final AppThemeMode themeMode;
 
   Preferences copyWith({
@@ -171,6 +175,7 @@ class Preferences {
     StoneTheme? whiteStones,
     bool? showCoordinates,
     bool? confirmMoves,
+    bool? stoneSound,
     AppThemeMode? themeMode,
   }) => Preferences(
     boardTheme: boardTheme ?? this.boardTheme,
@@ -178,6 +183,7 @@ class Preferences {
     whiteStones: whiteStones ?? this.whiteStones,
     showCoordinates: showCoordinates ?? this.showCoordinates,
     confirmMoves: confirmMoves ?? this.confirmMoves,
+    stoneSound: stoneSound ?? this.stoneSound,
     themeMode: themeMode ?? this.themeMode,
   );
 }
@@ -193,6 +199,7 @@ class PreferencesController extends Notifier<Preferences> {
   static const _coordinates = 'prefs.showCoordinates';
   static const _confirmMoves = 'prefs.confirmMoves';
   static const _themeMode = 'prefs.themeMode';
+  static const _stoneSound = 'prefs.stoneSound';
 
   SharedPreferences get _prefs => ref.read(sharedPreferencesProvider);
 
@@ -211,6 +218,7 @@ class PreferencesController extends Notifier<Preferences> {
       whiteStones: byName(StoneTheme.forWhite, prefs.getString(_whiteStones), StoneTheme.shell),
       showCoordinates: prefs.getBool(_coordinates) ?? true,
       confirmMoves: prefs.getBool(_confirmMoves) ?? true,
+      stoneSound: prefs.getBool(_stoneSound) ?? true,
       themeMode: byName(AppThemeMode.values, prefs.getString(_themeMode), AppThemeMode.system),
     );
   }
@@ -240,6 +248,11 @@ class PreferencesController extends Notifier<Preferences> {
   Future<void> setConfirmMoves(bool value) async {
     state = state.copyWith(confirmMoves: value);
     await _prefs.setBool(_confirmMoves, value);
+  }
+
+  Future<void> setStoneSound(bool value) async {
+    state = state.copyWith(stoneSound: value);
+    await _prefs.setBool(_stoneSound, value);
   }
 
   Future<void> setThemeMode(AppThemeMode mode) async {

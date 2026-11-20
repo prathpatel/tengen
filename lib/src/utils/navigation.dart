@@ -5,9 +5,8 @@ import 'package:material_ui/material_ui.dart';
 Future<T?> pushFullScreen<T>(BuildContext context, Widget screen) =>
     Navigator.of(context, rootNavigator: true).push(MaterialPageRoute<T>(builder: (_) => screen));
 
-/// Pushes a screen in the current tab's navigator.
-Future<T?> pushInTab<T>(BuildContext context, Widget screen) =>
-    Navigator.of(context).push(MaterialPageRoute<T>(builder: (_) => screen));
+/// Pushes a screen. There are no tabs any more: the same as [pushFullScreen].
+Future<T?> pushInTab<T>(BuildContext context, Widget screen) => pushFullScreen<T>(context, screen);
 
 Future<bool> confirm(
   BuildContext context, {

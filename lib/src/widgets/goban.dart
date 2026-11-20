@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/model/go/board.dart';
 import 'package:tengen/src/model/go/coordinates.dart';
 import 'package:tengen/src/model/settings/preferences.dart';
+import 'package:tengen/src/utils/stone_sound.dart';
 import 'package:tengen/src/widgets/goban_art.dart';
 
 /// Ownership markers drawn on the board when counting.
@@ -127,10 +128,14 @@ class Goban extends StatefulWidget {
     this.territory,
     this.viewport,
     this.marks = const {},
+    this.sound = false,
     super.key,
   });
 
   final Board board;
+
+  /// Plays the click of a stone when one is placed (the last move changes to a new stone).
+  final bool sound;
 
   /// Labels and shapes drawn on intersections.
   final Map<Point, GobanMark> marks;
@@ -209,6 +214,15 @@ class _GobanState extends State<Goban> {
   void didUpdateWidget(Goban oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.board != widget.board || widget.toPlay == null) _preview = null;
+    final last = widget.lastMove;
+    if (widget.sound &&
+        last != null &&
+        last != oldWidget.lastMove &&
+        widget.board.contains(last) &&
+        widget.board[last] != null &&
+        (!oldWidget.board.contains(last) || oldWidget.board[last] == null)) {
+      StoneSound.play(widget.board[last]!);
+    }
   }
 
   void _onTap(Offset local, GobanGeometry geometry) {
@@ -272,6 +286,7 @@ class _GobanState extends State<Goban> {
                   previewColor: widget.toPlay,
                   deadStones: widget.deadStones,
                   territory: widget.territory,
+                  accent: Theme.of(context).colorScheme.primary,
                 ),
               ),
             ),
@@ -298,7 +313,11 @@ class _GobanPainter extends CustomPainter {
     required this.previewColor,
     required this.deadStones,
     required this.territory,
+    required this.accent,
   }) : super(repaint: GobanArt.instance);
+
+  /// The last move marker, in the app's accent.
+  final Color accent;
 
   final Board board;
   final GobanViewport viewport;
@@ -394,14 +413,13 @@ class _GobanPainter extends CustomPainter {
 
     final last = lastMove;
     if (last != null && board[last] != null && !marks.containsKey(last)) {
-      final stone = board[last]!;
       canvas.drawCircle(
         geometry.offsetOf(last),
         cell * 0.22,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = math.max(1.5, cell * 0.07)
-          ..color = stone == StoneColor.black ? Colors.white : Colors.black,
+          ..strokeWidth = math.max(2, cell * 0.08)
+          ..color = accent,
       );
     }
   }
@@ -564,5 +582,6 @@ class _GobanPainter extends CustomPainter {
       old.previewColor != previewColor ||
       old.deadStones != deadStones ||
       old.territory != territory ||
-      old.geometry.cell != geometry.cell;
+      old.geometry.cell != geometry.cell ||
+      old.accent != accent;
 }

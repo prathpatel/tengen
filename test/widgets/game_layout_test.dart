@@ -3,28 +3,37 @@ import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/model/go/board.dart';
 import 'package:tengen/src/widgets/game_layout.dart';
 import 'package:tengen/src/widgets/player_bar.dart';
+import 'package:tengen/src/widgets/ui.dart';
 
-Widget layout() => const MaterialApp(
+Widget layout() => MaterialApp(
   home: Scaffold(
     body: GameLayout(
-      moveList: SizedBox(height: 44),
-      topPlayer: PlayerBar(
+      above: const PlayerPill(
         color: StoneColor.white,
         name: 'Computer',
-        captures: 3,
-        komi: 6.5,
+        detail: '3 captures · komi 6.5',
         active: false,
         note: 'Passed',
       ),
-      bottomPlayer: PlayerBar(color: StoneColor.black, name: 'You', captures: 30, active: true),
-      board: AspectRatio(
+      below: const PlayerPill(
+        color: StoneColor.black,
+        name: 'You',
+        detail: 'Your move · 30 captures',
+        active: true,
+        end: true,
+      ),
+      board: const AspectRatio(
         aspectRatio: 1,
         child: ColoredBox(key: Key('board'), color: Colors.brown),
       ),
-      actions: [
-        GameAction(icon: Icons.menu, tooltip: 'Menu'),
-        GameTextAction(label: 'Accept', primary: true, onPressed: null),
-      ],
+      actions: RoundActionBar(
+        actions: [
+          RoundAction(icon: Icons.undo_rounded, label: 'Undo', onPressed: () {}),
+          RoundAction(icon: Icons.arrow_forward_rounded, label: 'Pass', onPressed: () {}),
+          RoundAction(icon: Icons.history_rounded, label: 'Moves', onPressed: () {}),
+          const RoundAction(icon: Icons.flag_outlined, label: 'Resign', onPressed: null),
+        ],
+      ),
     ),
   ),
 );
@@ -53,22 +62,24 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the players and the board are centered between the moves and the buttons', (
-    tester,
-  ) async {
+  testWidgets('the players and the board are centered above the actions', (tester) async {
     await tester.binding.setSurfaceSize(const Size(412, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(layout());
-    final players = tester.getRect(find.byType(PlayerBar).first);
-    final lastPlayer = tester.getRect(find.byType(PlayerBar).last);
-    final moves = tester.getRect(find.byType(SizedBox).first);
-    final buttons = tester.getRect(find.byTooltip('Menu'));
-    expect(players.top, lessThan(lastPlayer.top));
-    final above = players.top - moves.bottom;
-    // The action bar: 4 px of padding above its 56 px row, the buttons centered in it.
-    final barTop = buttons.center.dy - 28 - 4;
-    final below = barTop - lastPlayer.bottom;
+    final top = tester.getRect(find.byType(PlayerPill).first);
+    final bottom = tester.getRect(find.byType(PlayerPill).last);
+    const actionsTop = 900 - kGameActionsHeight;
+    final above = top.top;
+    final below = actionsTop - bottom.bottom;
     expect(above, greaterThan(10));
     expect((above - below).abs(), lessThanOrEqualTo(1));
+  });
+
+  testWidgets('the opponent is on the left and you on the right', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(412, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(layout());
+    expect(tester.getRect(find.text('Computer')).left, lessThan(150));
+    expect(tester.getRect(find.text('You')).right, greaterThan(250));
   });
 }

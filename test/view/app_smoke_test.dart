@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/app.dart';
 import 'package:tengen/src/model/learn/learning_hub.dart';
-import 'package:tengen/src/view/more/more_tab_screen.dart';
 import 'package:tengen/src/view/settings/settings_screen.dart';
 
 import '../fakes.dart';
@@ -95,34 +94,58 @@ void main() {
             UncontrolledProviderScope(container: container, child: const TengenApp()),
           );
           await tester.pump(const Duration(milliseconds: 500));
-          expect(find.textContaining('alice'), findsWidgets);
-          expect(find.text('Quick pairing'), findsOneWidget);
-          // The recent games are further down the home screen.
-          await tester.dragUntilVisible(
-            find.text('vs a-very-long-opponent-username-indeed'),
-            find.byType(ListView).first,
-            const Offset(0, -250),
-          );
-          expect(tester.takeException(), isNull);
-
-          for (final tab in ['Puzzles', 'Learn', 'Watch', 'More', 'Home']) {
-            await tester.tap(find.text(tab).last);
-            await tester.pump(const Duration(milliseconds: 500));
-            // Answer the realtime game list requests.
+          void answerGameLists() {
             for (final m in sockets.single.sentCommands('gamelist/query').toList()) {
               sockets.single.serverReply(m[2]! as int, {'results': <Object?>[]});
             }
-            await tester.pump(const Duration(milliseconds: 300));
-            expect(tester.takeException(), isNull, reason: tab);
           }
 
-          // The new game screen, both tabs.
-          await tester.tap(find.text('Play').last);
+          // The hub.
+          expect(find.text('Play now'), findsOneWidget);
+          expect(find.byTooltip('alice'), findsOneWidget);
+          answerGameLists();
+          await tester.pump(const Duration(milliseconds: 300));
+          expect(tester.takeException(), isNull, reason: 'home');
+
+          // Puzzles, Learn and Watch open in sheets over the home screen.
+          Future<void> openSheet(String card, String expected) async {
+            await tester.ensureVisible(find.text(card).first);
+            await tester.pumpAndSettle();
+            await tester.tap(find.text(card).first);
+            await tester.pump(const Duration(milliseconds: 500));
+            answerGameLists();
+            await tester.pump(const Duration(milliseconds: 300));
+            expect(find.text(expected), findsWidgets, reason: card);
+            expect(tester.takeException(), isNull, reason: card);
+            // The board of the home screen stays in view above the sheet: tapping it closes it.
+            await tester.tapAt(Offset(size.width / 2, 10));
+            await tester.pumpAndSettle();
+          }
+
+          await openSheet('Puzzles', 'TOP COLLECTIONS');
+          await openSheet('Learn', 'Learn to play Go');
+          await openSheet('Watch', 'Updated live');
+
+          // My games, full screen.
+          await tester.ensureVisible(find.text('My games'));
+          await tester.tap(find.text('My games'));
           await tester.pumpAndSettle();
-          expect(find.text('Handicaps'), findsOneWidget);
+          expect(find.text('vs a-very-long-opponent-username-indeed'), findsOneWidget);
+          expect(tester.takeException(), isNull, reason: 'my games');
+          await tester.pageBack();
+          await tester.pumpAndSettle();
+
+          // The new game sheet, its three tabs.
+          await tester.ensureVisible(find.byTooltip('New game'));
+          await tester.tap(find.byTooltip('New game'));
+          await tester.pumpAndSettle();
+          expect(find.text('HANDICAPS'), findsOneWidget);
+          await tester.ensureVisible(find.text('Required'));
           await tester.tap(find.text('Required'));
           await tester.pump();
-          expect(find.textContaining('Play 9×9 rapid'), findsOneWidget);
+          expect(find.textContaining('Find opponent · 9×9'), findsOneWidget);
+          expect(tester.takeException(), isNull, reason: 'online');
+          await tester.ensureVisible(find.text('Computer'));
           await tester.tap(find.text('Computer'));
           // The bot list loads until the server sends it (a spinner: no settling).
           await tester.pump(const Duration(milliseconds: 500));
@@ -133,35 +156,40 @@ void main() {
           await tester.pumpAndSettle();
           expect(find.text('Choose a computer opponent'), findsOneWidget);
           expect(tester.takeException(), isNull, reason: 'computer');
+          await tester.ensureVisible(find.text('Offline'));
+          await tester.pumpAndSettle();
           await tester.tap(find.text('Offline'));
           await tester.pumpAndSettle();
           expect(find.text('Start game'), findsOneWidget);
-          expect(tester.takeException(), isNull, reason: 'new game');
-          await tester.pageBack();
+          expect(tester.takeException(), isNull, reason: 'offline');
+          await tester.tap(find.byTooltip('Close'));
           await tester.pumpAndSettle();
 
-          // Settings, from the More tab.
-          await tester.tap(find.text('More').last);
-          await tester.pump(const Duration(milliseconds: 300));
-          await tester.scrollUntilVisible(
-            find.text('Settings'),
-            200,
-            scrollable: find
-                .descendant(of: find.byType(MoreTabScreen), matching: find.byType(Scrollable))
-                .first,
-          );
-          await tester.ensureVisible(find.text('Settings'));
+          // Settings, from the board chip.
+          await tester.ensureVisible(find.text('Kaya'));
           await tester.pumpAndSettle();
-          await tester.tap(find.text('Settings'));
-          await tester.pump(const Duration(milliseconds: 500));
+          await tester.tap(find.text('Kaya'));
+          await tester.pumpAndSettle();
           await tester.scrollUntilVisible(
-            find.text('Theme'),
+            find.text('Stone sound'),
             200,
             scrollable: find
                 .descendant(of: find.byType(SettingsScreen), matching: find.byType(Scrollable))
                 .first,
           );
           expect(tester.takeException(), isNull, reason: 'settings');
+          await tester.pageBack();
+          await tester.pumpAndSettle();
+
+          // The profile, from the account sheet.
+          await tester.ensureVisible(find.byTooltip('alice'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byTooltip('alice'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Your profile'));
+          await tester.pumpAndSettle();
+          expect(find.text('Open on OGS'), findsOneWidget);
+          expect(tester.takeException(), isNull, reason: 'profile');
 
           // Tear down inside the test so that the socket timers are cancelled.
           await tester.pumpWidget(const SizedBox());

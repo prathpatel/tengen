@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/model/learn/learning_hub.dart';
 import 'package:tengen/src/utils/navigation.dart';
 import 'package:tengen/src/view/learn/hub_topic_screen.dart';
+import 'package:tengen/src/widgets/ui.dart';
 
 /// The lessons of a Learning Hub section.
 class HubSectionScreen extends ConsumerWidget {
@@ -18,7 +19,7 @@ class HubSectionScreen extends ConsumerWidget {
     final scheme = theme.colorScheme;
     final section = hub?.sections[sectionIndex];
     return Scaffold(
-      appBar: AppBar(title: Text(section?.title ?? 'Learn')),
+      appBar: TopBar(title: section?.title ?? 'Learn'),
       body: section == null
           ? const Center(child: CircularProgressIndicator())
           : ListView.separated(

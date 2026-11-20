@@ -33,6 +33,7 @@ the sections below:
 | --- | --- | --- | --- |
 | Learning Hub lessons (converted) | `assets/learning_hub/` | online-go.com | AGPL-3.0 |
 | Board textures, BadukTV and Anime stone images | `assets/goban/` | online-go.com | AGPL-3.0 |
+| Stone sounds (the "Floor Goban (deep)" pack, cut into single clicks) | `assets/sounds/stones/` | online-go.com | AGPL-3.0 |
 | Stone renderer (Phong shading, shell lines) and theme colors, ported to Dart | `lib/src/widgets/goban_art.dart`, `lib/src/model/settings/preferences.dart` | goban | Apache-2.0 |
 | Check of the game settings a bot accepts (`getAcceptableTimeSetting`), ported to Dart | `botAccepts` in `lib/src/model/ogs/bots.dart` | online-go.com | AGPL-3.0 |
 | Bot rejection messages (reworded) | `rejectionMessage` in `lib/src/model/online_game/bot_challenge_controller.dart` | online-go.com | AGPL-3.0 |
@@ -81,3 +82,17 @@ match clock times come from `src/views/Play/SPEED_OPTIONS.ts`, and `ratingToRank
 `provisionalDeviation` (`lib/src/model/ogs/user.dart`) use the formula and cutoff of
 `src/lib/rank_utils.ts`. © the online-go.com
 contributors, GNU AGPL v3 (see `assets/learning_hub/LICENSE-AGPL-3.0.txt`).
+
+Stone sounds
+------------
+
+`assets/sounds/stones/` holds the ten clicks of the "Floor Goban (deep)" sound pack of the
+[online-go.com web client](https://github.com/online-go/online-go.com)
+(`assets/sound/zz-un-floor-goban-deep.v7.mp3`), cut at the offsets of its `src/lib/sfx_sprites.ts`,
+© the online-go.com contributors, GNU AGPL v3.
+
+Inter font
+----------
+
+`assets/fonts/inter/` is the [Inter](https://github.com/rsms/inter) typeface, © The Inter Project
+Authors, under the SIL Open Font License 1.1 (`assets/fonts/inter/OFL.txt`).

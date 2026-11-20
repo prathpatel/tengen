@@ -1,11 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:tengen/src/model/go/board.dart';
 import 'package:tengen/src/model/go/coordinates.dart';
 import 'package:tengen/src/model/puzzle/puzzle.dart';
 import 'package:tengen/src/model/settings/preferences.dart';
 import 'package:tengen/src/utils/navigation.dart';
 import 'package:tengen/src/widgets/game_layout.dart';
 import 'package:tengen/src/widgets/goban.dart';
+import 'package:tengen/src/widgets/player_bar.dart';
+import 'package:tengen/src/widgets/ui.dart';
 
 /// Solves OGS puzzles, one after the other in their collection.
 class PuzzleScreen extends ConsumerStatefulWidget {
@@ -42,28 +45,24 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
     });
 
     final puzzle = async.value?.puzzle;
+    final description = puzzle?.description;
     return Scaffold(
-      appBar: AppBar(
-        title: GameTitle(
-          icon: Icons.extension_outlined,
-          title: puzzle?.name.isNotEmpty ?? false ? puzzle!.name : 'Puzzle',
-          subtitle: [
-            if (puzzle != null) puzzle.typeLabel,
-            if (index >= 0) '${index + 1} of ${summary!.length}',
-          ].join(' · '),
-        ),
+      appBar: TopBar(
+        title: index >= 0
+            ? 'Puzzle ${index + 1} of ${summary!.length}'
+            : (puzzle?.name.isNotEmpty ?? false ? puzzle!.name : 'Puzzle'),
+        subtitle: [?puzzle?.collectionName, ?puzzle?.typeLabel].join(' · '),
         actions: [
-          if (puzzle?.description != null)
-            IconButton(
+          if (description != null)
+            CircleIconButton(
+              icon: Icons.info_outline_rounded,
               tooltip: 'About this collection',
-              icon: const Icon(Icons.info_outline),
               onPressed: () => showModalBottomSheet<void>(
                 context: context,
-                showDragHandle: true,
                 builder: (_) => SafeArea(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                    child: Text(puzzle!.description!),
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                    child: Text(description, style: Theme.of(context).textTheme.bodyLarge),
                   ),
                 ),
               ),
@@ -89,7 +88,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
   }
 }
 
-class _PuzzleBody extends ConsumerWidget {
+class _PuzzleBody extends ConsumerStatefulWidget {
   const _PuzzleBody({
     required this.puzzleId,
     required this.state,
@@ -103,117 +102,212 @@ class _PuzzleBody extends ConsumerWidget {
   final VoidCallback? onNext;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final controller = ref.read(puzzleProvider(puzzleId).notifier);
+  ConsumerState<_PuzzleBody> createState() => _PuzzleBodyState();
+}
+
+class _PuzzleBodyState extends ConsumerState<_PuzzleBody> {
+  /// The hint shown: the moves to try from the current position.
+  Set<Point>? _hint;
+
+  @override
+  void didUpdateWidget(_PuzzleBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A hint is for one position.
+    if (oldWidget.state.game.moveCount != widget.state.game.moveCount ||
+        oldWidget.puzzleId != widget.puzzleId) {
+      _hint = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    final controller = ref.read(puzzleProvider(widget.puzzleId).notifier);
     final prefs = ref.watch(preferencesProvider);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final puzzle = state.puzzle;
     final viewport = GobanViewport.around(puzzle.board, puzzle.interestingPoints);
+    final toPlay = puzzle.toPlay == StoneColor.black ? 'Black' : 'White';
+    final hint = _hint;
 
-    final (Color bg, Color fg, IconData icon) = switch (state.status) {
-      PuzzleStatus.correct => (Colors.green.shade700, Colors.white, Icons.check_circle),
-      PuzzleStatus.wrong => (scheme.errorContainer, scheme.onErrorContainer, Icons.cancel),
-      PuzzleStatus.solving => (
-        scheme.surfaceContainerHigh,
-        scheme.onSurface,
-        Icons.lightbulb_outline,
+    // The card under the board: the result, the hint, or the comment of the position.
+    final Widget? card = switch (state.status) {
+      PuzzleStatus.correct => _StatusCard(
+        icon: Icons.check_rounded,
+        title: 'Correct!',
+        text: state.node.text,
+        color: scheme.secondary,
+        background: scheme.secondaryContainer,
       ),
+      PuzzleStatus.wrong => _StatusCard(
+        icon: Icons.close_rounded,
+        title: 'Not the answer',
+        text: state.node.text ?? 'Tap Retry to try again.',
+        color: scheme.error,
+        background: scheme.errorContainer,
+      ),
+      PuzzleStatus.solving when hint != null => _StatusCard(
+        icon: Icons.lightbulb_outline_rounded,
+        title: hint.isEmpty
+            ? 'No hint for this position'
+            : 'Hint: try ${hint.map((p) => prettyCoordinate(p, puzzle.board.height)).join(' or ')}',
+        // The comment the puzzle's author wrote on that move, if any.
+        text: hint.map((p) => state.node.branchAt(p)?.text).nonNulls.firstOrNull,
+        color: scheme.primary,
+        background: scheme.surfaceContainer,
+        outlined: true,
+      ),
+      PuzzleStatus.solving when state.node.text != null => _StatusCard(
+        icon: Icons.chat_bubble_outline_rounded,
+        title: state.node.text!,
+        color: scheme.onSurfaceVariant,
+        background: scheme.surfaceContainer,
+      ),
+      _ => null,
     };
 
-    return Column(
-      children: [
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: double.infinity,
-          margin: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(16)),
-          child: Row(
-            children: [
-              Icon(icon, color: fg),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  state.opponentThinking ? '…' : state.message,
-                  style: theme.textTheme.titleSmall?.copyWith(color: fg),
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
-                ),
+    return GameLayout(
+      above: Padding(
+        padding: const EdgeInsets.only(bottom: 14, top: 4),
+        // A row, not a Center: the pill keeps its own height (the board takes the rest).
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(12, 10, 18, 10),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(30),
               ),
-              if (!puzzle.hasSolution)
-                Text('No solution', style: theme.textTheme.labelSmall?.copyWith(color: fg)),
-            ],
-          ),
-        ),
-        Expanded(
-          child: Center(
-            child: Goban(
-              board: state.game.board,
-              viewport: viewport,
-              theme: prefs.boardTheme,
-              blackStones: prefs.blackStones,
-              whiteStones: prefs.whiteStones,
-              showCoordinates: prefs.showCoordinates,
-              confirmMoves: prefs.confirmMoves,
-              lastMove: state.game.position.lastMove?.point,
-              toPlay: state.canPlay ? state.game.toMove : null,
-              onPlay: (p) {
-                final error = controller.play(p);
-                if (error != null) showSnack(context, error.message);
-              },
-            ),
-          ),
-        ),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.3))),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  GameAction(
-                    icon: Icons.refresh,
-                    tooltip: 'Try again',
-                    onPressed: state.game.moveCount > 0 ? controller.retry : null,
-                  ),
-                  GameAction(
-                    icon: Icons.lightbulb_outline,
-                    tooltip: 'Hint',
-                    onPressed: state.canPlay
-                        ? () {
-                            final hint = controller.hint();
-                            showSnack(
-                              context,
-                              hint.isEmpty
-                                  ? 'No hint for this position'
-                                  : 'Try ${hint.map((p) => prettyCoordinate(p, puzzle.board.height)).join(' or ')}',
-                            );
-                          }
-                        : null,
-                  ),
-                  GameAction(
-                    icon: Icons.chevron_left,
-                    tooltip: 'Previous puzzle',
-                    large: true,
-                    onPressed: onPrevious,
-                  ),
-                  GameAction(
-                    icon: Icons.chevron_right,
-                    tooltip: 'Next puzzle',
-                    large: true,
-                    onPressed: onNext,
+                  StoneIcon(puzzle.toPlay, size: 22),
+                  const SizedBox(width: 10),
+                  Text(
+                    state.opponentThinking
+                        ? 'Answering…'
+                        : !puzzle.hasSolution
+                        ? '$toPlay to play · no solution given'
+                        : '$toPlay to play',
+                    style: theme.textTheme.titleMedium,
                   ),
                 ],
               ),
             ),
-          ),
+          ],
         ),
-      ],
+      ),
+      board: Goban(
+        board: state.game.board,
+        viewport: viewport,
+        theme: prefs.boardTheme,
+        blackStones: prefs.blackStones,
+        whiteStones: prefs.whiteStones,
+        showCoordinates: prefs.showCoordinates,
+        confirmMoves: prefs.confirmMoves,
+        sound: prefs.stoneSound,
+        lastMove: state.game.position.lastMove?.point,
+        toPlay: state.canPlay ? state.game.toMove : null,
+        marks: {for (final p in hint ?? const <Point>{}) p: const ShapeMark(ShapeKind.circle)},
+        onPlay: (p) {
+          final error = controller.play(p);
+          if (error != null) showSnack(context, error.message);
+        },
+      ),
+      below: card ?? const SizedBox(height: 8),
+      actions: RoundActionBar(
+        actions: [
+          RoundAction(
+            icon: Icons.chevron_left_rounded,
+            label: 'Previous',
+            onPressed: widget.onPrevious,
+          ),
+          RoundAction(
+            icon: Icons.lightbulb_outline_rounded,
+            label: 'Hint',
+            highlighted: hint != null,
+            onPressed: state.canPlay
+                ? () => setState(() => _hint = hint == null ? controller.hint() : null)
+                : null,
+          ),
+          RoundAction(
+            icon: Icons.refresh_rounded,
+            label: 'Retry',
+            onPressed: state.game.moveCount > 0 ? controller.retry : null,
+          ),
+          RoundAction(icon: Icons.chevron_right_rounded, label: 'Next', onPressed: widget.onNext),
+        ],
+      ),
+    );
+  }
+}
+
+/// The result, a hint or a comment, under the board.
+class _StatusCard extends StatelessWidget {
+  const _StatusCard({
+    required this.icon,
+    required this.title,
+    required this.color,
+    required this.background,
+    this.text,
+    this.outlined = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? text;
+  final Color color;
+  final Color background;
+  final bool outlined;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: outlined ? color : color.withValues(alpha: 0.35), width: 1.5),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 26),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                // Its own height: under the board, the card must not take the board's room.
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(color: color, fontSize: 18),
+                  ),
+                  if (text != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      text!,
+                      maxLines: 5,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

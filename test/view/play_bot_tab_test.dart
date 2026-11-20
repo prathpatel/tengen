@@ -42,6 +42,7 @@ void main() {
       '1': botJson(id: 1, username: 'katago-micro', ranking: 38, sizes: [19]),
       '2': botJson(id: 2, username: 'amybot-beginner', ranking: 5),
       '3': botJson(id: 3, username: 'GnuGo', ranking: 19),
+      '4': botJson(id: 4, username: '10k-kgs-humanlike-kata', ranking: 18.6),
     });
     await tester.pumpAndSettle();
 
@@ -49,10 +50,11 @@ void main() {
     expect(find.text('GnuGo'), findsOneWidget);
     expect(find.text('amybot-beginner'), findsNothing);
     expect(find.text('Choose a computer opponent'), findsOneWidget);
+    // What the name tells of the engine.
+    expect(find.text('KataGo · plays like a person of its rank'), findsOneWidget);
 
     await tester.tap(find.text('Advanced'));
     await tester.pumpAndSettle();
-    expect(find.text('KataGo'), findsOneWidget);
     // 9×9 by default: KataGo micro only plays 19×19 here, and says so.
     expect(find.text('Plays on 19×19'), findsOneWidget);
     await tester.tap(find.text('Intermediate'));
@@ -60,7 +62,7 @@ void main() {
 
     await tester.tap(find.text('GnuGo'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Play GnuGo'));
+    await tester.tap(find.text('Play GnuGo · 11k'));
     await tester.pump();
     await tester.pump();
     expect(posts.single.url.path, '/api/v1/players/3/challenge');

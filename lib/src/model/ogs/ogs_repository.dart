@@ -47,6 +47,22 @@ class OgsRepository {
     ];
   }
 
+  /// How many games of player [id] match [filters] (the fields of the OGS games API: `black`,
+  /// `white`, `black_lost`, `white_lost`, `annulled`, `ended__isnull`…).
+  Future<int> countGames(int id, Map<String, String> filters) async {
+    final json = asMap(
+      await _http.get('/api/v1/players/$id/games', {...filters, 'page_size': '1'}),
+    );
+    return asInt(json?['count']) ?? 0;
+  }
+
+  /// A game with its moves (`gamedata` of `/api/v1/games/<id>`).
+  Future<OgsGameData?> gameData(int id) async {
+    final json = asMap(await _http.get('/api/v1/games/$id'));
+    final data = asMap(json?['gamedata']);
+    return data == null ? null : OgsGameData.fromJson({...data, 'game_id': id});
+  }
+
   /// Ongoing public games, best ranked first. [list] is `live` or `corr`.
   Future<List<GameListEntry>> liveGames({String list = 'live', int limit = 50}) async {
     final reply = asMap(
@@ -91,4 +107,65 @@ final playerProvider = FutureProvider.autoDispose.family<OgsUser, int>(
 
 final playerGamesProvider = FutureProvider.autoDispose.family<List<PlayerGame>, int>(
   (ref, id) => ref.watch(ogsRepositoryProvider).playerGames(id),
+);
+
+/// Finished, not annulled games: the same filters for every count.
+const _finished = {'ended__isnull': 'false', 'annulled': 'false'};
+
+/// A player's finished games, and how many they won, counted by OGS.
+final playerStatsProvider = FutureProvider.autoDispose.family<({int games, int wins}), int>((
+  ref,
+  id,
+) async {
+  final repo = ref.watch(ogsRepositoryProvider);
+  final counts = await Future.wait([
+    repo.countGames(id, _finished),
+    repo.countGames(id, {
+      ..._finished,
+      'black': '$id',
+      'white_lost': 'true',
+      'black_lost': 'false',
+    }),
+    repo.countGames(id, {
+      ..._finished,
+      'white': '$id',
+      'black_lost': 'true',
+      'white_lost': 'false',
+    }),
+  ]);
+  return (games: counts[0], wins: counts[1] + counts[2]);
+});
+
+/// The record of [me] against [them]: the games each won, counted by OGS.
+final headToHeadProvider = FutureProvider.autoDispose
+    .family<({int wins, int losses}), ({int me, int them})>((ref, players) async {
+      final repo = ref.watch(ogsRepositoryProvider);
+      final (:me, :them) = players;
+      Future<int> won(int winner, int loser) async {
+        final counts = await Future.wait([
+          repo.countGames(them, {
+            ..._finished,
+            'black': '$winner',
+            'white': '$loser',
+            'white_lost': 'true',
+            'black_lost': 'false',
+          }),
+          repo.countGames(them, {
+            ..._finished,
+            'black': '$loser',
+            'white': '$winner',
+            'black_lost': 'true',
+            'white_lost': 'false',
+          }),
+        ]);
+        return counts[0] + counts[1];
+      }
+
+      final results = await Future.wait([won(me, them), won(them, me)]);
+      return (wins: results[0], losses: results[1]);
+    });
+
+/// The moves of a game, for a small board (finished games come without them).
+final gameDataProvider = FutureProvider.autoDispose.family<OgsGameData?, int>(
+  (ref, id) => ref.watch(ogsRepositoryProvider).gameData(id),
 );

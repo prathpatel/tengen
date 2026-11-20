@@ -21,6 +21,7 @@ import 'package:tengen/src/widgets/goban.dart';
 import 'package:tengen/src/widgets/move_list.dart';
 import 'package:tengen/src/widgets/player_bar.dart';
 import 'package:tengen/src/widgets/result_dialog.dart';
+import 'package:tengen/src/widgets/ui.dart';
 
 /// Plays or watches a game on online-go.com.
 class OnlineGameScreen extends ConsumerStatefulWidget {
@@ -38,6 +39,9 @@ class _OnlineGameScreenState extends ConsumerState<OnlineGameScreen> {
 
   /// Chat messages already seen; the history present when the game opens counts as seen.
   int? _seenChat;
+
+  /// The move list shown under the board.
+  bool _showMoves = false;
 
   int get gameId => widget.gameId;
 
@@ -160,26 +164,28 @@ class _OnlineGameScreenState extends ConsumerState<OnlineGameScreen> {
       }
     });
 
+    final value = async.value;
     return Scaffold(
-      appBar: AppBar(
-        title: switch (async) {
-          AsyncData(:final value) => GameTitle(
-            icon: _speedIcon(value.data.timeControl?.speed),
-            title: [
-              if (value.data.timeControl?.speed case final speed?)
-                speed[0].toUpperCase() + speed.substring(1),
-              if (value.data.timeControl case final tc? when tc.system != 'none') tc.description,
-            ].join(' · ').ifEmpty(value.data.name.isEmpty ? 'Game $gameId' : value.data.name),
-            subtitle: _subtitle(value),
-          ),
-          _ => Text('Game $gameId'),
-        },
+      appBar: TopBar(
+        title: value == null ? 'Game $gameId' : _title(value),
+        subtitle: !connected ? 'Reconnecting…' : (value == null ? null : _subtitle(value)),
+        muted: true,
         actions: [
-          if (!connected)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Tooltip(message: 'Reconnecting…', child: Icon(Icons.cloud_off)),
+          if (value != null) ...[
+            CircleIconButton(
+              icon: Icons.chat_bubble_outline_rounded,
+              tooltip: 'Chat',
+              badge: value.chat.length - (_seenChat ??= value.chat.length),
+              onPressed: () async {
+                await showGameChat(context, gameId);
+                if (mounted) {
+                  setState(
+                    () => _seenChat = ref.read(onlineGameProvider(gameId)).value?.chat.length,
+                  );
+                }
+              },
             ),
+          ],
         ],
       ),
       body: switch (async) {
@@ -190,13 +196,11 @@ class _OnlineGameScreenState extends ConsumerState<OnlineGameScreen> {
           onShowPly: (p) => _showPly(p, value.game.moveCount),
           onOpenAnalysis: () => _openAnalysis(value),
           onShowResult: _announceResult,
-          unreadChat: value.chat.length - (_seenChat ??= value.chat.length),
-          onOpenChat: () async {
-            await showGameChat(context, gameId);
-            if (mounted) {
-              setState(() => _seenChat = ref.read(onlineGameProvider(gameId)).value?.chat.length);
-            }
-          },
+          showMoves: _showMoves,
+          onShowMoves: (show) => setState(() {
+            _showMoves = show;
+            if (!show) _reviewPly = null;
+          }),
         ),
         AsyncError(:final error) => Center(
           child: Padding(
@@ -216,10 +220,10 @@ class _OnlineGameBody extends ConsumerWidget {
     required this.state,
     required this.ply,
     required this.onShowPly,
-    required this.unreadChat,
-    required this.onOpenChat,
     required this.onOpenAnalysis,
     required this.onShowResult,
+    required this.showMoves,
+    required this.onShowMoves,
   });
 
   final int gameId;
@@ -228,9 +232,11 @@ class _OnlineGameBody extends ConsumerWidget {
   /// The number of moves shown on the board.
   final int ply;
   final ValueChanged<int> onShowPly;
-  final int unreadChat;
-  final VoidCallback onOpenChat;
   final VoidCallback onOpenAnalysis;
+
+  /// The move list under the board, with the move by move controls.
+  final bool showMoves;
+  final ValueChanged<bool> onShowMoves;
 
   /// Shows the result dialog again, once the game is over.
   final VoidCallback onShowResult;
@@ -252,17 +258,24 @@ class _OnlineGameBody extends ConsumerWidget {
         ? scoreGame(game, data.removed)
         : null;
 
-    Widget bar(StoneColor color) {
+    Widget pill(StoneColor color) {
       final player = data.player(color);
       final clock = data.clock;
-      return PlayerBar(
+      final captures = position.capturesOf(color);
+      final toMove = phase == GamePhase.play && game.toMove == color;
+      final mine = color == state.myColor;
+      return PlayerPill(
         color: color,
-        name: player.username,
+        name: mine ? 'You' : player.username,
         rank: player.rankLabel,
         isBot: player.isBot,
-        captures: position.capturesOf(color),
-        komi: color == StoneColor.white ? data.komi : null,
-        active: phase == GamePhase.play && game.toMove == color,
+        end: color == bottomColor,
+        active: toMove,
+        detail: [
+          if (toMove && mine) 'Your move',
+          '$captures ${captures == 1 ? 'capture' : 'captures'}',
+          if (color == StoneColor.white && data.komi != 0) 'komi ${_points(data.komi)}',
+        ].join(' · '),
         onTap: player.id > 0
             ? () => pushFullScreen<void>(context, PlayerScreen(playerId: player.id))
             : null,
@@ -345,15 +358,149 @@ class _OnlineGameBody extends ConsumerWidget {
       ),
     );
 
+    Future<void> resign() async {
+      if (await confirm(context, title: 'Resign this game?', confirmLabel: 'Resign')) {
+        controller.resign();
+      }
+    }
+
+    final moves = RoundAction(
+      icon: Icons.history_rounded,
+      label: 'Moves',
+      highlighted: showMoves,
+      onPressed: () => onShowMoves(!showMoves),
+    );
+
+    final Widget above;
+    final Widget below;
+    final Widget actions;
+    if (removal && live && score != null) {
+      above = GamePrompt(
+        icon: Icons.front_hand_outlined,
+        text: state.isPlayer
+            ? 'Both passed. Tap the dead stones, then Accept.'
+            : 'The players are marking the dead stones.',
+      );
+      final winner = score.winner;
+      below = ScoreCard(
+        lines: [
+          for (final c in [bottomColor, bottomColor.opposite])
+            ScoreLine(
+              color: c,
+              name: c == state.myColor ? 'You' : data.player(c).username,
+              detail: scoreDetail(c == StoneColor.black ? score.black : score.white),
+              total: (c == StoneColor.black ? score.black : score.white).total,
+            ),
+        ],
+        verdict: winner == null
+            ? 'Jigo'
+            : winner == state.myColor
+            ? 'You win by ${_points(score.margin)}'
+            : '${data.player(winner).username} wins by ${_points(score.margin)}',
+        result: '${score.resultString} · estimate',
+      );
+      actions = state.isPlayer
+          ? GameButtons(
+              secondary: FilledButton(
+                style: softButtonStyle(context),
+                onPressed: controller.rejectRemoved,
+                child: const Text('Resume play'),
+              ),
+              primary: FilledButton(
+                onPressed: controller.acceptRemoved,
+                child: const Text('Accept'),
+              ),
+            )
+          : RoundActionBar(actions: [moves]);
+    } else {
+      above = pill(bottomColor.opposite);
+      below = showMoves
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: MoveList(
+                moves: game.moves,
+                boardHeight: game.height,
+                selected: ply,
+                onSelect: onShowPly,
+              ),
+            )
+          : pill(bottomColor);
+      actions = RoundActionBar(
+        actions: showMoves
+            ? [
+                RoundAction(
+                  icon: Icons.chevron_left_rounded,
+                  label: 'Previous',
+                  onPressed: ply > 0 ? () => onShowPly(ply - 1) : null,
+                ),
+                RoundAction(
+                  icon: Icons.chevron_right_rounded,
+                  label: 'Next',
+                  onPressed: live ? null : () => onShowPly(ply + 1),
+                ),
+                RoundAction(
+                  icon: Icons.last_page_rounded,
+                  label: 'Live',
+                  onPressed: live ? null : () => onShowPly(game.moveCount),
+                ),
+                moves,
+              ]
+            : finished
+            ? [
+                RoundAction(
+                  icon: Icons.info_outline_rounded,
+                  label: 'Result',
+                  onPressed: onShowResult,
+                ),
+                moves,
+                RoundAction(
+                  icon: Icons.biotech_outlined,
+                  label: 'Analysis',
+                  onPressed: onOpenAnalysis,
+                ),
+                RoundAction(icon: Icons.more_horiz_rounded, label: 'More', onPressed: showMenu),
+              ]
+            : canAct
+            ? [
+                RoundAction(
+                  icon: Icons.undo_rounded,
+                  label: 'Undo',
+                  onPressed: !state.isMyTurn && game.moveCount > 0
+                      ? () {
+                          controller.requestUndo();
+                          showSnack(context, 'Undo requested');
+                        }
+                      : null,
+                ),
+                RoundAction(
+                  icon: Icons.arrow_forward_rounded,
+                  label: 'Pass',
+                  onPressed: live && state.isMyTurn
+                      ? () async {
+                          if (await confirm(context, title: 'Pass?', confirmLabel: 'Pass')) {
+                            controller.pass();
+                          }
+                        }
+                      : null,
+                ),
+                moves,
+                RoundAction(icon: Icons.flag_outlined, label: 'Resign', onPressed: resign),
+              ]
+            : [
+                moves,
+                RoundAction(
+                  icon: Icons.biotech_outlined,
+                  label: 'Analysis',
+                  onPressed: onOpenAnalysis,
+                ),
+                RoundAction(icon: Icons.more_horiz_rounded, label: 'More', onPressed: showMenu),
+              ],
+      );
+    }
+
     return GameLayout(
-      moveList: MoveList(
-        moves: game.moves,
-        boardHeight: game.height,
-        selected: ply,
-        onSelect: onShowPly,
-      ),
-      topPlayer: bar(bottomColor.opposite),
-      bottomPlayer: bar(bottomColor),
+      above: above,
+      below: below,
       board: Goban(
         board: position.board,
         theme: prefs.boardTheme,
@@ -361,6 +508,7 @@ class _OnlineGameBody extends ConsumerWidget {
         whiteStones: prefs.whiteStones,
         showCoordinates: prefs.showCoordinates,
         confirmMoves: prefs.confirmMoves,
+        sound: prefs.stoneSound,
         lastMove: position.lastMove?.point,
         toPlay: !live
             ? null
@@ -378,79 +526,22 @@ class _OnlineGameBody extends ConsumerWidget {
             ? null
             : GobanTerritory(black: score.blackTerritory, white: score.whiteTerritory),
       ),
-      actions: [
-        GameAction(icon: Icons.menu, tooltip: 'Menu', onPressed: showMenu),
-        GameAction(
-          icon: Icons.chat_bubble_outline,
-          tooltip: 'Chat',
-          badge: unreadChat,
-          onPressed: onOpenChat,
-        ),
-        if (finished)
-          GameAction(icon: Icons.info_outline, tooltip: 'Result', onPressed: onShowResult),
-        if (removal && state.isPlayer && live) ...[
-          GameTextAction(
-            label: 'Resume',
-            icon: Icons.play_arrow_outlined,
-            onPressed: controller.rejectRemoved,
-          ),
-          GameTextAction(
-            label: 'Accept',
-            icon: Icons.check,
-            primary: true,
-            onPressed: controller.acceptRemoved,
-          ),
-        ],
-        if (canAct) ...[
-          GameAction(
-            icon: Icons.front_hand_outlined,
-            tooltip: 'Pass',
-            onPressed: live && state.isMyTurn
-                ? () async {
-                    if (await confirm(context, title: 'Pass?', confirmLabel: 'Pass')) {
-                      controller.pass();
-                    }
-                  }
-                : null,
-          ),
-          GameAction(
-            icon: Icons.undo,
-            tooltip: 'Request undo',
-            onPressed: !state.isMyTurn && game.moveCount > 0
-                ? () {
-                    controller.requestUndo();
-                    showSnack(context, 'Undo requested');
-                  }
-                : null,
-          ),
-        ],
-        GameAction(
-          icon: Icons.chevron_left,
-          tooltip: 'Previous move',
-          large: true,
-          onPressed: ply > 0 ? () => onShowPly(ply - 1) : null,
-        ),
-        GameAction(
-          icon: Icons.chevron_right,
-          tooltip: 'Next move',
-          large: true,
-          onPressed: live ? null : () => onShowPly(ply + 1),
-        ),
-      ],
+      actions: actions,
     );
   }
 }
 
-IconData _speedIcon(String? speed) => switch (speed) {
-  'blitz' => Icons.bolt,
-  'rapid' => Icons.timer_outlined,
-  'live' => Icons.schedule,
-  'correspondence' => Icons.mail_outline,
-  _ => Icons.grid_on,
-};
+String _points(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toString();
 
-extension on String {
-  String ifEmpty(String fallback) => isEmpty ? fallback : this;
+/// `Move 28 · 19×19 · Rapid`
+String _title(OnlineGameState s) {
+  final data = s.data;
+  final speed = data.timeControl?.speed;
+  return [
+    if (s.game.moveCount > 0) 'Move ${s.game.moveCount}',
+    '${data.width}×${data.height}',
+    if (speed != null && speed.isNotEmpty) speed[0].toUpperCase() + speed.substring(1),
+  ].join(' · ');
 }
 
 /// The title's second line: the game settings, or the phase when it matters.
@@ -467,8 +558,11 @@ String _subtitle(OnlineGameState s) {
           ? result.short
           : '${result.short} · ${data.player(winner).username} wins';
     case GamePhase.play:
-      return '${data.width}×${data.height} · ${data.ruleset.label} · '
-          '${data.ranked ? 'Ranked' : 'Unranked'}'
-          '${data.handicap > 1 ? ' · ${data.handicap} handicap' : ''}';
+      return [
+        data.ruleset.label,
+        if (data.timeControl case final tc? when tc.system != 'none') tc.description,
+        if (data.ranked) 'Ranked',
+        if (data.handicap > 1) '${data.handicap} handicap',
+      ].join(' · ');
   }
 }

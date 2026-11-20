@@ -57,19 +57,26 @@ void main() {
     );
   });
 
-  testWidgets('passing twice goes to counting, shown in the title and the action bar', (
+  testWidgets('passing twice goes to counting: a prompt, the score, Resume and Accept', (
     tester,
   ) async {
     await pumpScreen(tester, confirmMoves: false);
+    // A phone of usual height (a bit taller: the test font's square glyphs wrap the prompt to
+    // three lines, where Inter takes two).
+    await tester.binding.setSurfaceSize(const Size(412, 960));
+    await tester.pump();
     final boardBefore = tester.getRect(find.byType(Goban));
     await tester.tap(find.byTooltip('Pass'));
     await tester.pump();
     expect(find.text('Passed'), findsOneWidget);
     await tester.tap(find.byTooltip('Pass'));
     await tester.pump();
-    expect(find.textContaining('Counting · W+6.5'), findsOneWidget);
-    // Messages never take room from the board.
-    expect(tester.getRect(find.byType(Goban)), boardBefore);
+    expect(find.text('Both passed. Tap the dead stones, then Accept.'), findsOneWidget);
+    expect(find.text('White wins by 6.5'), findsOneWidget);
+    expect(find.text('W+6.5'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Resume play'), findsOneWidget);
+    // The prompt and the score do not take the board's width.
+    expect(tester.getRect(find.byType(Goban)).width, boardBefore.width);
     await tester.tap(find.widgetWithText(FilledButton, 'Accept'));
     await tester.pumpAndSettle();
     expect(find.text('Game over · W+6.5'), findsOneWidget);
@@ -81,13 +88,15 @@ void main() {
     await tester.pump();
     await tester.tapAt(pointOffset(tester, const Point(6, 6)));
     await tester.pump();
-    // The move list shows both moves with their coordinates.
+    // The move list, under the board with the Moves button, shows both moves.
+    await tester.tap(find.byTooltip('Moves'));
+    await tester.pump();
     expect(find.text('C7'), findsOneWidget);
     expect(find.text('G3'), findsOneWidget);
 
     Board shownBoard() => tester.widget<Goban>(find.byType(Goban)).board;
 
-    await tester.tap(find.byTooltip('Previous move'));
+    await tester.tap(find.byTooltip('Previous'));
     await tester.pump();
     expect(shownBoard()[const Point(6, 6)], isNull);
 
@@ -108,9 +117,7 @@ void main() {
 
   testWidgets('resigning shows the result dialog', (tester) async {
     await pumpScreen(tester, confirmMoves: false);
-    await tester.tap(find.byTooltip('Menu'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Resign'));
+    await tester.tap(find.byTooltip('Resign'));
     await tester.pumpAndSettle();
     // The confirmation dialog.
     await tester.tap(find.widgetWithText(FilledButton, 'Resign'));

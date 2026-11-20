@@ -6,6 +6,7 @@ import 'package:tengen/src/model/ogs/user.dart';
 import 'package:tengen/src/utils/navigation.dart';
 import 'package:tengen/src/view/auth/sign_in_screen.dart';
 import 'package:tengen/src/view/user/player_screen.dart';
+import 'package:tengen/src/widgets/ui.dart';
 
 /// An OGS chat room: messages, the people in the room and a field to write.
 class ChatRoomScreen extends ConsumerStatefulWidget {
@@ -83,22 +84,13 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     final topic = state.topic?.trim() ?? '';
 
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('${room.flag}  ${room.name}'),
-            Text(
-              state.joined ? '${users.length} online' : 'Joining…',
-              style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-            ),
-          ],
-        ),
+      appBar: TopBar(
+        title: '${room.flag}  ${room.name}',
+        subtitle: state.joined ? '${users.length} in the room' : 'Joining…',
         actions: [
-          IconButton(
+          CircleIconButton(
             tooltip: 'People in the room',
-            icon: const Icon(Icons.people_outline),
+            icon: Icons.people_outline_rounded,
             onPressed: users.isEmpty ? null : () => _showUsers(users),
           ),
         ],

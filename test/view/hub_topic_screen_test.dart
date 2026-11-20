@@ -108,35 +108,35 @@ void main() {
     expect(tester.widget<Goban>(find.byType(Goban)).marks, hasLength(3));
     await tester.tap(find.widgetWithText(FilledButton, '4'));
     await tester.pump();
-    expect(find.text('Puzzle failed!'), findsOneWidget);
-    await tester.tap(find.text('Retry'));
+    expect(find.text('Not quite'), findsOneWidget);
+    await tester.tap(find.byTooltip('Start the page again'));
     await tester.pump();
     await tester.tap(find.widgetWithText(FilledButton, '3'));
     await tester.pump();
     expect(find.text('Great job!'), findsOneWidget);
     expect(container.read(hubProgressProvider), {'demo/0'});
-    await tester.tap(find.text('Next'));
+    await tester.tap(find.text('Next page'));
     await tester.pump();
 
     // A move: off the tree fails, the answer succeeds.
     expect(find.text('Capture the white stone.'), findsOneWidget);
     await tester.tapAt(at(tester, const Point(8, 8)));
     await tester.pump();
-    expect(find.text('Puzzle failed!'), findsOneWidget);
-    await tester.tap(find.text('Retry'));
+    expect(find.text('Not quite'), findsOneWidget);
+    await tester.tap(find.byTooltip('Start the page again'));
     await tester.pump();
     await tester.tapAt(at(tester, const Point(4, 3)));
     await tester.pump();
     expect(find.text('Great job!'), findsOneWidget);
     expect(tester.widget<Goban>(find.byType(Goban)).board[const Point(3, 3)], isNull);
-    await tester.tap(find.text('Next'));
+    await tester.tap(find.text('Next page'));
     await tester.pump();
 
     // A button page.
     await tester.tap(find.widgetWithText(FilledButton, 'Pass'));
     await tester.pump();
     expect(find.text('Great job!'), findsOneWidget);
-    await tester.tap(find.text('Next'));
+    await tester.tap(find.text('Next page'));
     await tester.pump();
 
     // Stone removal.

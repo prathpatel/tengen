@@ -34,65 +34,65 @@ class SegmentedChoice<T> extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final enabled = onChanged != null;
-    final radius = BorderRadius.circular(24);
+    // A dark track with the selected option on a lighter pill, as in the Tengen design.
     return Opacity(
       opacity: enabled ? 1 : 0.5,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 44),
+        constraints: const BoxConstraints(minHeight: 52),
+        padding: const EdgeInsets.all(5),
         decoration: BoxDecoration(
-          borderRadius: radius,
-          border: Border.all(color: scheme.outline),
+          color: scheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(16),
         ),
-        child: ClipRRect(
-          borderRadius: radius,
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final (i, choice) in choices.indexed) ...[
-                  if (i > 0) VerticalDivider(width: 1, thickness: 1, color: scheme.outline),
-                  Expanded(
-                    child: Semantics(
-                      selected: choice.value == selected,
-                      button: true,
-                      child: Material(
-                        color: choice.value == selected
-                            ? scheme.primaryContainer
-                            : Colors.transparent,
-                        child: InkWell(
-                          onTap: enabled ? () => onChanged!(choice.value) : null,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                            child: Center(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (choice.icon != null) ...[
-                                      Icon(
-                                        choice.icon,
-                                        size: 18,
-                                        color: choice.value == selected
-                                            ? scheme.onPrimaryContainer
-                                            : scheme.onSurface,
-                                      ),
-                                      const SizedBox(width: 6),
-                                    ],
-                                    Text(
-                                      choice.label,
-                                      maxLines: 1,
-                                      style: theme.textTheme.labelLarge?.copyWith(
-                                        color: choice.value == selected
-                                            ? scheme.onPrimaryContainer
-                                            : scheme.onSurface,
-                                        fontWeight: choice.value == selected
-                                            ? FontWeight.w700
-                                            : FontWeight.w500,
-                                      ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final choice in choices)
+                Expanded(
+                  child: Semantics(
+                    selected: choice.value == selected,
+                    button: true,
+                    child: Material(
+                      color: choice.value == selected
+                          ? scheme.surfaceContainerHighest
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: enabled ? () => onChanged!(choice.value) : null,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                          child: Center(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (choice.icon != null) ...[
+                                    Icon(
+                                      choice.icon,
+                                      size: 18,
+                                      color: choice.value == selected
+                                          ? scheme.onSurface
+                                          : scheme.onSurfaceVariant,
                                     ),
+                                    const SizedBox(width: 6),
                                   ],
-                                ),
+                                  Text(
+                                    choice.label,
+                                    maxLines: 1,
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontSize: 17,
+                                      color: choice.value == selected
+                                          ? scheme.onSurface
+                                          : scheme.onSurfaceVariant,
+                                      fontWeight: choice.value == selected
+                                          ? FontWeight.w600
+                                          : FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -100,9 +100,8 @@ class SegmentedChoice<T> extends StatelessWidget {
                       ),
                     ),
                   ),
-                ],
-              ],
-            ),
+                ),
+            ],
           ),
         ),
       ),

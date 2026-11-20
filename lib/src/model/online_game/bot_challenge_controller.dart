@@ -17,15 +17,24 @@ class BotChallengeIdle extends BotChallengeState {
   const BotChallengeIdle();
 }
 
-/// The challenge is being sent, or waits for the bot to accept it.
+/// The challenge is being sent, or waits for the opponent to accept it.
 class BotChallengeWaiting extends BotChallengeState {
-  const BotChallengeWaiting(this.bot, {this.challengeId, this.gameId});
+  const BotChallengeWaiting(this.opponent, {this.challengeId, this.gameId});
 
-  final OgsBot bot;
+  /// The opponent's name.
+  final String opponent;
 
   /// Known once OGS has created the challenge.
   final int? challengeId;
   final int? gameId;
+}
+
+/// A correspondence challenge, sent: the game starts when the opponent accepts it, maybe days
+/// later (it then appears in the games list).
+class BotChallengeSent extends BotChallengeState {
+  const BotChallengeSent(this.opponent);
+
+  final String opponent;
 }
 
 class BotChallengeAccepted extends BotChallengeState {
@@ -73,8 +82,12 @@ class BotChallengeController extends Notifier<BotChallengeState> {
 
   /// The body of the challenge, built like the OGS "Play computer" button.
   @visibleForTesting
-  static Map<String, Object?> challengeBody(BotGameOptions options, BotClock clock) => {
-    'challenger_color': 'automatic',
+  static Map<String, Object?> challengeBody(
+    BotGameOptions options,
+    BotClock clock, {
+    String color = 'automatic',
+  }) => {
+    'challenger_color': color,
     'invite_only': false,
     'min_ranking': -1000,
     'max_ranking': 1000,
@@ -102,14 +115,44 @@ class BotChallengeController extends Notifier<BotChallengeState> {
       state = BotChallengeFailed(problem ?? '${bot.username} cannot play this game');
       return;
     }
-    state = BotChallengeWaiting(bot);
+    await _send(
+      playerId: bot.id,
+      name: bot.username,
+      body: challengeBody(options, clock),
+      timeout: botAnswerTimeout,
+    );
+  }
+
+  /// Challenges a person, as the OGS player page does. A live game waits here for their answer
+  /// (as long as the challenge is not cancelled); a correspondence one is just sent.
+  Future<void> challengePlayer({
+    required int playerId,
+    required String name,
+    required BotGameOptions options,
+    String color = 'automatic',
+  }) async {
+    if (state is BotChallengeWaiting) return;
+    final correspondence = options.clock.speed == GameSpeed.correspondence;
+    await _send(
+      playerId: playerId,
+      name: name,
+      body: challengeBody(options, options.clock, color: color),
+      wait: !correspondence,
+    );
+  }
+
+  Future<void> _send({
+    required int playerId,
+    required String name,
+    required Map<String, Object?> body,
+    Duration? timeout,
+    bool wait = true,
+  }) async {
+    state = BotChallengeWaiting(name);
     final http = ref.read(ogsHttpProvider);
     final Object? response;
     try {
-      response = await http.post(
-        '/api/v1/players/${bot.id}/challenge',
-        challengeBody(options, clock),
-      );
+      response = await http.post('/api/v1/players/$playerId/challenge', body);
     } on Object catch (e) {
       if (!ref.mounted) return;
       state = BotChallengeFailed(e is OgsHttpException ? e.message : 'Could not reach OGS');
@@ -128,7 +171,11 @@ class BotChallengeController extends Notifier<BotChallengeState> {
       state = const BotChallengeFailed('OGS did not create the game');
       return;
     }
-    state = BotChallengeWaiting(bot, challengeId: challengeId, gameId: gameId);
+    if (!wait) {
+      state = BotChallengeSent(name);
+      return;
+    }
+    state = BotChallengeWaiting(name, challengeId: challengeId, gameId: gameId);
     _pendingChallenge = challengeId;
 
     final socket = ref.read(ogsSocketProvider);
@@ -148,7 +195,7 @@ class BotChallengeController extends Notifier<BotChallengeState> {
           state = BotChallengeFailed(
             rejectionMessage(asMap(n['rejection_details'])) ??
                 (n['message'] as String?) ??
-                '${bot.username} declined the game',
+                '$name declined the game',
           );
         }),
       );
@@ -158,12 +205,14 @@ class BotChallengeController extends Notifier<BotChallengeState> {
     _keepalive = Timer.periodic(const Duration(seconds: 1), (_) {
       socket.send('challenge/keepalive', {'challenge_id': challengeId, 'game_id': gameId});
     });
-    _timeout = Timer(botAnswerTimeout, () {
-      _stop();
-      unawaited(_withdraw(challengeId));
-      socket.send('game/disconnect', {'game_id': gameId});
-      state = BotChallengeFailed('${bot.username} did not answer. Try another bot.');
-    });
+    if (timeout != null) {
+      _timeout = Timer(timeout, () {
+        _stop();
+        unawaited(_withdraw(challengeId));
+        socket.send('game/disconnect', {'game_id': gameId});
+        state = BotChallengeFailed('$name did not answer. Try another bot.');
+      });
+    }
   }
 
   /// Withdraws the challenge.
