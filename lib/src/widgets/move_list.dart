@@ -3,7 +3,8 @@ import 'package:tengen/src/model/go/coordinates.dart';
 import 'package:tengen/src/model/go/game.dart';
 import 'package:tengen/src/widgets/player_bar.dart';
 
-/// The moves of a game in a horizontal strip, as in the lichess app: `12 ● D4  13 ○ Q16 …`.
+/// The moves of a game in a horizontal strip, in pairs as in the chess.com and lichess apps:
+/// `1. ● D4 ○ Q16   2. ● C3 ○ R4 …`, one number for each two moves.
 ///
 /// [selected] is the number of moves shown on the board (0 for the initial position). Tapping a
 /// move selects the position after it. The current move is highlighted and kept in view.
@@ -99,15 +100,27 @@ class _MoveListState extends State<MoveList> {
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Row(
           children: [
-            for (final (i, move) in widget.moves.indexed)
-              _MoveItem(
-                key: widget.selected == i + 1 ? _selectedKey : null,
-                number: i + 1,
-                move: move,
-                label: prettyCoordinate(move.point, widget.boardHeight),
-                selected: widget.selected == i + 1,
-                onTap: () => widget.onSelect(i + 1),
+            for (var pair = 0; pair * 2 < widget.moves.length; pair++) ...[
+              if (pair > 0) const SizedBox(width: 10),
+              Padding(
+                padding: const EdgeInsets.only(left: 4, right: 2),
+                child: Text(
+                  '${pair + 1}.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  ),
+                ),
               ),
+              for (final i in [pair * 2, pair * 2 + 1])
+                if (i < widget.moves.length)
+                  _MoveItem(
+                    key: widget.selected == i + 1 ? _selectedKey : null,
+                    move: widget.moves[i],
+                    label: prettyCoordinate(widget.moves[i].point, widget.boardHeight),
+                    selected: widget.selected == i + 1,
+                    onTap: () => widget.onSelect(i + 1),
+                  ),
+            ],
           ],
         ),
       ),
@@ -115,9 +128,9 @@ class _MoveListState extends State<MoveList> {
   }
 }
 
+/// One move: its stone and coordinate, on a highlight when it is the move shown.
 class _MoveItem extends StatelessWidget {
   const _MoveItem({
-    required this.number,
     required this.move,
     required this.label,
     required this.selected,
@@ -125,7 +138,6 @@ class _MoveItem extends StatelessWidget {
     super.key,
   });
 
-  final int number;
   final GoMove move;
   final String label;
   final bool selected;
@@ -135,31 +147,31 @@ class _MoveItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 10),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '$number.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: selected ? scheme.primary : scheme.onSurfaceVariant.withValues(alpha: 0.7),
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 1),
+      child: Material(
+        color: selected ? scheme.surfaceContainerHighest : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                StoneIcon(move.color, size: 12),
+                const SizedBox(width: 5),
+                Text(
+                  label,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: scheme.onSurface,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 5),
-            StoneIcon(move.color, size: 12),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: selected ? scheme.primary : scheme.onSurface,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
