@@ -36,14 +36,18 @@ flutter:
     - assets/goban/stones/
 
 # App icons, wired as in github.com/prathpatel/GoGame (same artwork, same files):
-# - Android 8+: the adaptive icon is vector drawables (res/drawable/ic_launcher_background.xml, a
+# - Android: the adaptive icon is vector drawables (res/drawable/ic_launcher_background.xml, a
 #   kaya gradient, and ic_launcher_foreground.xml, also the monochrome layer for themed icons),
-#   referenced by res/mipmap-anydpi-v26/ic_launcher.xml and ic_launcher_round.xml.
-# - Older Android, iOS and web: PNGs made from assets/icon/ by `dart run flutter_launcher_icons`.
-#   That command also rewrites mipmap-anydpi-v26/ic_launcher.xml: restore it from git afterwards.
+#   referenced by res/mipmap-anydpi-v26/ic_launcher.xml and ic_launcher_round.xml, with PNGs in
+#   res/mipmap-*dpi/ for Android 7 and older. `android: false` below keeps
+#   `dart run flutter_launcher_icons` away from them: it would replace the vectors with a flat
+#   background and a PNG. test/android_icon_test.dart checks they stay. For a new Android icon,
+#   edit the vectors, or set `android: "ic_launcher"` for one run with the new artwork.
+# - iOS and web: PNGs made from assets/icon/ by `dart run flutter_launcher_icons`. It also sets an
+#   invalid value in ios/Runner.xcodeproj/project.pbxproj: `git checkout` that file afterwards.
 # - tool/gen_icon.py renders assets/icon/*.png from the vector drawables.
 flutter_launcher_icons:
-  android: "ic_launcher"
+  android: false
   ios: true
   image_path: "assets/icon/icon.png"
   adaptive_icon_background: "#F0D5A8"
