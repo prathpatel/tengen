@@ -52,4 +52,23 @@ void main() {
     expect(board.bottom, lessThan(tester.getRect(find.text('You')).top));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('the players and the board are centered between the moves and the buttons', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(412, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(layout());
+    final players = tester.getRect(find.byType(PlayerBar).first);
+    final lastPlayer = tester.getRect(find.byType(PlayerBar).last);
+    final moves = tester.getRect(find.byType(SizedBox).first);
+    final buttons = tester.getRect(find.byTooltip('Menu'));
+    expect(players.top, lessThan(lastPlayer.top));
+    final above = players.top - moves.bottom;
+    // The action bar: 4 px of padding above its 56 px row, the buttons centered in it.
+    final barTop = buttons.center.dy - 28 - 4;
+    final below = barTop - lastPlayer.bottom;
+    expect(above, greaterThan(10));
+    expect((above - below).abs(), lessThanOrEqualTo(1));
+  });
 }

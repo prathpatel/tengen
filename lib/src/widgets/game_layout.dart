@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/model/go/board.dart';
 import 'package:tengen/src/model/go/coordinates.dart';
@@ -86,9 +88,14 @@ class GameLayout extends StatelessWidget {
         top: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [for (final a in actions) Flexible(child: a)],
+          // A fixed height, whatever the buttons (icons while playing, labels when counting):
+          // the board is centered in the room left, and must not move.
+          child: SizedBox(
+            height: 56,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [for (final a in actions) Flexible(child: a)],
+            ),
           ),
         ),
       ),
@@ -236,7 +243,10 @@ class _GameAreaLayout extends MultiChildLayoutDelegate {
     final room = (size.height - gap * 2 - topHeight - bottomHeight).clamp(0.0, size.height);
     final boardSize = layoutChild(board, BoxConstraints(maxWidth: size.width, maxHeight: room));
 
-    var y = gap;
+    // The players and the board as one block, centered: the space they leave is shared evenly
+    // above and below, as in the chess.com app, rather than all left under the bottom player.
+    final block = topHeight + boardSize.height + bottomHeight;
+    var y = math.max(gap, (size.height - block) / 2);
     positionChild(top, Offset(0, y));
     y += topHeight;
     positionChild(board, Offset((size.width - boardSize.width) / 2, y));
