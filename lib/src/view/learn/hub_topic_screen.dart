@@ -296,6 +296,8 @@ class _HubTopicScreenState extends ConsumerState<HubTopicScreen> {
                       ? {for (final e in page.marks.entries) e.key: _mark(e.value)}
                       : const {},
                   theme: prefs.boardTheme,
+                  blackStones: prefs.blackStones,
+                  whiteStones: prefs.whiteStones,
                   showCoordinates: prefs.showCoordinates,
                   lastMove: solver?.game.position.lastMove?.point,
                   toPlay: canPlay ? (solver?.game.toMove ?? page.toPlay) : null,
@@ -323,8 +325,11 @@ class _HubTopicScreenState extends ConsumerState<HubTopicScreen> {
                                   ? (option.value == choice.correct
                                         ? Colors.green.shade700
                                         : scheme.error)
-                                  : null,
-                              foregroundColor: _chosen == option.value ? Colors.white : null,
+                                  : scheme.surfaceContainerHigh,
+                              foregroundColor: _chosen == option.value
+                                  ? Colors.white
+                                  : scheme.onSurface,
+                              textStyle: theme.textTheme.titleMedium,
                               padding: const EdgeInsets.symmetric(horizontal: 6),
                             ),
                             onPressed: _status == PuzzleStatus.solving

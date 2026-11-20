@@ -201,7 +201,7 @@ class _OnlinePlayState extends ConsumerState<_OnlinePlay> {
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Material(
                     color: settings.speed == speed
-                        ? scheme.secondaryContainer
+                        ? scheme.primaryContainer
                         : scheme.surfaceContainer,
                     borderRadius: BorderRadius.circular(14),
                     child: InkWell(

@@ -140,6 +140,8 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
         board: Goban(
           board: position.board,
           theme: prefs.boardTheme,
+          blackStones: prefs.blackStones,
+          whiteStones: prefs.whiteStones,
           showCoordinates: prefs.showCoordinates,
           lastMove: position.lastMove?.point,
           toPlay: _counting ? null : position.toMove,

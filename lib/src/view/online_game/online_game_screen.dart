@@ -357,6 +357,8 @@ class _OnlineGameBody extends ConsumerWidget {
       board: Goban(
         board: position.board,
         theme: prefs.boardTheme,
+        blackStones: prefs.blackStones,
+        whiteStones: prefs.whiteStones,
         showCoordinates: prefs.showCoordinates,
         confirmMoves: prefs.confirmMoves,
         lastMove: position.lastMove?.point,

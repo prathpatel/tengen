@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/model/go/board.dart';
 import 'package:tengen/src/model/go/coordinates.dart';
 import 'package:tengen/src/model/settings/preferences.dart';
+import 'package:tengen/src/widgets/goban_art.dart';
 
 /// Ownership markers drawn on the board when counting.
 @immutable
@@ -113,6 +114,8 @@ class Goban extends StatefulWidget {
   const Goban({
     required this.board,
     this.theme = BoardTheme.kaya,
+    this.blackStones = StoneTheme.slate,
+    this.whiteStones = StoneTheme.shell,
     this.showCoordinates = true,
     this.lastMove,
     this.toPlay,
@@ -135,6 +138,8 @@ class Goban extends StatefulWidget {
   /// The part of the board shown; the whole board when null.
   final GobanViewport? viewport;
   final BoardTheme theme;
+  final StoneTheme blackStones;
+  final StoneTheme whiteStones;
   final bool showCoordinates;
   final Point? lastMove;
 
@@ -258,6 +263,8 @@ class _GobanState extends State<Goban> {
                   marks: widget.marks,
                   geometry: geometry,
                   theme: widget.theme,
+                  blackStones: widget.blackStones,
+                  whiteStones: widget.whiteStones,
                   showCoordinates: widget.showCoordinates,
                   lastMove: widget.lastMove,
                   preview: _preview,
@@ -282,6 +289,8 @@ class _GobanPainter extends CustomPainter {
     required this.marks,
     required this.geometry,
     required this.theme,
+    required this.blackStones,
+    required this.whiteStones,
     required this.showCoordinates,
     required this.lastMove,
     required this.preview,
@@ -289,13 +298,15 @@ class _GobanPainter extends CustomPainter {
     required this.previewColor,
     required this.deadStones,
     required this.territory,
-  });
+  }) : super(repaint: GobanArt.instance);
 
   final Board board;
   final GobanViewport viewport;
   final Map<Point, GobanMark> marks;
   final GobanGeometry geometry;
   final BoardTheme theme;
+  final StoneTheme blackStones;
+  final StoneTheme whiteStones;
   final bool showCoordinates;
   final Point? lastMove;
   final Point? preview;
@@ -316,20 +327,8 @@ class _GobanPainter extends CustomPainter {
     );
     canvas.clipRect(boardRect);
 
-    // Wood, edge to edge as in the lichess app.
-    canvas.drawRect(
-      boardRect,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color.lerp(theme.wood, Colors.white, 0.08)!,
-            theme.wood,
-            Color.lerp(theme.wood, Colors.black, 0.08)!,
-          ],
-        ).createShader(boardRect),
-    );
+    // The board, edge to edge as in the lichess app.
+    _paintBackground(canvas, boardRect, boardRect);
 
     // Grid.
     final linePaint = Paint()
@@ -354,7 +353,7 @@ class _GobanPainter extends CustomPainter {
         linePaint,
       );
     }
-    final starPaint = Paint()..color = theme.lines;
+    final starPaint = Paint()..color = theme.stars;
     for (final p in starPoints(board.width, board.height).where(vp.contains)) {
       canvas.drawCircle(geometry.offsetOf(p), cell * 0.1, starPaint);
     }
@@ -407,33 +406,39 @@ class _GobanPainter extends CustomPainter {
     }
   }
 
+  /// The OGS texture of the theme, or its color while the texture loads.
+  void _paintBackground(Canvas canvas, Rect area, Rect boardRect) {
+    final path = theme.textureAsset;
+    final texture = path == null ? null : GobanArt.instance.asset(path);
+    canvas.drawRect(area, Paint()..color = theme.wood);
+    if (texture == null) return;
+    canvas
+      ..save()
+      ..clipRect(area);
+    paintImage(
+      canvas: canvas,
+      rect: boardRect,
+      image: texture,
+      fit: BoxFit.cover,
+      filterQuality: FilterQuality.medium,
+    );
+    canvas.restore();
+  }
+
   void _paintStone(Canvas canvas, Point p, StoneColor color, {double opacity = 1}) {
     final cell = geometry.cell;
     final center = geometry.offsetOf(p);
     final radius = cell * 0.48;
-    if (opacity == 1) {
-      canvas.drawCircle(
-        center + Offset(cell * 0.04, cell * 0.06),
-        radius,
-        Paint()
-          ..color = Colors.black.withValues(alpha: 0.3)
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, cell * 0.05),
-      );
-    }
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    final colors = color == StoneColor.black
-        ? const [Color(0xFF5A5A5A), Color(0xFF1A1A1A), Color(0xFF000000)]
-        : const [Color(0xFFFFFFFF), Color(0xFFEDEDED), Color(0xFFBDBDBD)];
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..shader = RadialGradient(
-          center: const Alignment(-0.35, -0.4),
-          radius: 0.95,
-          colors: [for (final c in colors) c.withValues(alpha: opacity)],
-          stops: const [0, 0.55, 1],
-        ).createShader(rect),
+    paintStone(
+      canvas,
+      center: center,
+      radius: radius,
+      color: color,
+      theme: color == StoneColor.black ? blackStones : whiteStones,
+      lineColor: theme.lines,
+      // A stable choice among the shell stones, as each stone of a real board differs.
+      variant: (p.x * 7 + p.y * 13 + p.x * p.y) % kShellVariants,
+      opacity: opacity,
     );
     if (opacity < 1 && opacity <= 0.45) {
       // Dead stone cross.
@@ -460,7 +465,17 @@ class _GobanPainter extends CustomPainter {
       case LabelMark(:final text):
         if (stone == null) {
           // Clear the grid lines under the label.
-          canvas.drawCircle(center, cell * 0.36, Paint()..color = theme.wood);
+          final boardRect = Rect.fromLTWH(
+            0,
+            0,
+            (viewport.columns - 1 + 2 * geometry.margin) * cell,
+            (viewport.rows - 1 + 2 * geometry.margin) * cell,
+          );
+          canvas
+            ..save()
+            ..clipPath(Path()..addOval(Rect.fromCircle(center: center, radius: cell * 0.36)));
+          _paintBackground(canvas, boardRect, boardRect);
+          canvas.restore();
         }
         final painter = TextPainter(
           text: TextSpan(
@@ -505,7 +520,7 @@ class _GobanPainter extends CustomPainter {
   void _paintCoordinates(Canvas canvas) {
     final cell = geometry.cell;
     final style = TextStyle(
-      color: theme.lines.withValues(alpha: 0.85),
+      color: theme.labels,
       fontSize: cell * 0.38,
       fontWeight: FontWeight.w600,
     );
@@ -540,6 +555,8 @@ class _GobanPainter extends CustomPainter {
       old.viewport != viewport ||
       old.marks != marks ||
       old.theme != theme ||
+      old.blackStones != blackStones ||
+      old.whiteStones != whiteStones ||
       old.showCoordinates != showCoordinates ||
       old.lastMove != lastMove ||
       old.preview != preview ||

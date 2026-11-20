@@ -7,6 +7,7 @@ import 'package:tengen/src/view/learn/coordinate_training_screen.dart';
 import 'package:tengen/src/view/learn/hub_section_screen.dart';
 import 'package:tengen/src/view/learn/hub_topic_screen.dart';
 import 'package:tengen/src/view/offline_game/offline_game_screen.dart';
+import 'package:tengen/src/widgets/hero_card.dart';
 import 'package:tengen/src/widgets/list_section.dart';
 
 /// The OGS Learning Hub course, and practice tools.
@@ -36,65 +37,41 @@ class LearnTabScreen extends ConsumerWidget {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Material(
-                        color: scheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(20),
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          onTap: next == null
-                              ? null
-                              : () => pushFullScreen<void>(
-                                  context,
-                                  HubTopicScreen(
-                                    topicId: next.id,
-                                    initialPage: _firstUndone(done, next),
-                                  ),
-                                ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Learn to play Go',
-                                  style: theme.textTheme.titleLarge?.copyWith(
-                                    color: scheme.onPrimaryContainer,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'The interactive course of online-go.com: '
-                                  '${value.topics.length} lessons, $total exercises.',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: scheme.onPrimaryContainer,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(4),
-                                  child: LinearProgressIndicator(
-                                    value: total == 0 ? 0 : completed / total,
-                                    minHeight: 6,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  next == null
-                                      ? 'Course completed!'
-                                      : '$completed of $total done · '
-                                            '${completed == 0 ? 'Start' : 'Continue'}: '
-                                            '${next.number} ${next.title}',
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                    color: scheme.onPrimaryContainer,
-                                  ),
-                                ),
-                              ],
+                    HeroCard(
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      title: 'Learn to play Go',
+                      body:
+                          'The interactive course of online-go.com: '
+                          '${value.topics.length} lessons, $total exercises.',
+                      onTap: next == null
+                          ? null
+                          : () => pushFullScreen<void>(
+                              context,
+                              HubTopicScreen(
+                                topicId: next.id,
+                                initialPage: _firstUndone(done, next),
+                              ),
+                            ),
+                      footer: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: total == 0 ? 0 : completed / total,
+                              minHeight: 6,
                             ),
                           ),
-                        ),
+                          const SizedBox(height: 10),
+                          Text(
+                            next == null
+                                ? 'Course completed!'
+                                : '$completed of $total done · '
+                                      '${completed == 0 ? 'Start' : 'Continue'}: '
+                                      '${next.number} ${next.title}',
+                            style: theme.textTheme.labelLarge?.copyWith(color: Colors.white),
+                          ),
+                        ],
                       ),
                     ),
                     const SectionHeader('Sections'),

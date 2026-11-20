@@ -22,7 +22,8 @@ The OGS client follows the protocol and conventions of the
 [online-go.com web client](https://github.com/online-go/online-go.com) and the
 [goban](https://github.com/online-go/goban) library (AGPL-3.0 and Apache-2.0). No code from those
 projects is included: the Dart implementation here is original, written against their documented
-behavior. The Learning Hub course content is the exception, see below.
+behavior. The exceptions are the Learning Hub course content and the board and stone themes, see
+below.
 
 "Lichess" and "OGS"/"online-go.com" are the names of their respective projects; Tengen is not
 affiliated with or endorsed by either.
@@ -36,3 +37,14 @@ play Go" course), © the online-go.com contributors, licensed under the GNU Affe
 License v3. It is distributed under that license: see `assets/learning_hub/LICENSE-AGPL-3.0.txt`
 and `assets/learning_hub/README.md`. The GNU GPL v3 (the rest of Tengen) and the GNU AGPL v3 allow
 these works to be combined (section 13 of both licenses); the AGPL terms apply to that content.
+
+Board and stone themes
+----------------------
+
+The board textures and stone images in `assets/goban/` come from the
+[online-go.com web client](https://github.com/online-go/online-go.com) (`assets/img/`), © the
+online-go.com contributors, under the GNU AGPL v3 (see `assets/learning_hub/LICENSE-AGPL-3.0.txt`);
+the Anime stones were rasterized from its SVG files. The theme colors and the stone renderer of
+`lib/src/widgets/goban_art.dart` (Phong shading, clam shell lines) are ported from the
+[goban](https://github.com/online-go/goban) library (`src/Goban/themes/`), © Online-Go.com,
+licensed under the Apache License 2.0.

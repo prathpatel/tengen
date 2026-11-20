@@ -16,6 +16,7 @@ import 'package:tengen/src/view/online_game/online_game_screen.dart';
 import 'package:tengen/src/view/play/play_screen.dart';
 import 'package:tengen/src/view/user/player_screen.dart';
 import 'package:tengen/src/widgets/board_thumbnail.dart';
+import 'package:tengen/src/widgets/hero_card.dart';
 import 'package:tengen/src/widgets/list_section.dart';
 import 'package:tengen/src/widgets/player_bar.dart';
 
@@ -43,11 +44,28 @@ class HomeTabScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 72,
-        title: Text(
-          signedIn ? '${_greeting(DateTime.now())}, ${user!.username}' : 'Welcome to Tengen',
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.headlineSmall,
-        ),
+        title: signedIn
+            ? Text(
+                '${_greeting(DateTime.now())}, ${user!.username}',
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.headlineSmall,
+              )
+            : Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(9),
+                    child: Image.asset('assets/icon/icon.png', width: 34, height: 34),
+                  ),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Text(
+                      'Tengen',
+                      style: theme.textTheme.headlineSmall,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -63,7 +81,7 @@ class HomeTabScreen extends ConsumerWidget {
                         children: [
                           CircleAvatar(
                             radius: 20,
-                            backgroundColor: theme.colorScheme.secondaryContainer,
+                            backgroundColor: theme.colorScheme.primaryContainer,
                             foregroundImage: user!.iconUrl != null
                                 ? NetworkImage(user.iconUrl!)
                                 : null,
@@ -76,7 +94,7 @@ class HomeTabScreen extends ConsumerWidget {
                               width: 13,
                               height: 13,
                               decoration: BoxDecoration(
-                                color: connected ? Colors.green.shade500 : Colors.orange,
+                                color: connected ? theme.colorScheme.secondary : Colors.orange,
                                 shape: BoxShape.circle,
                                 border: Border.all(
                                   color: theme.scaffoldBackgroundColor,
@@ -160,46 +178,26 @@ class _SignInCard extends StatelessWidget {
   const _SignInCard();
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Play Go online', style: theme.textTheme.titleLarge),
-          const SizedBox(height: 6),
-          Text(
-            'Sign in with your online-go.com account to play rated games, follow your games '
-            'and chat.',
-            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              FilledButton(
-                onPressed: () => pushFullScreen<void>(context, const SignInScreen()),
-                child: const Text('Sign in'),
-              ),
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: () => pushFullScreen<void>(
-                  context,
-                  const OfflineGameScreen(setup: OfflineGameSetup()),
-                ),
-                child: const Text('Play the computer'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => HeroCard(
+    title: 'Play Go online',
+    body:
+        'Sign in with your online-go.com account to play rated games, follow your games and chat.',
+    footer: Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: [
+        FilledButton(
+          onPressed: () => pushFullScreen<void>(context, const SignInScreen()),
+          child: const Text('Sign in'),
+        ),
+        TextButton(
+          onPressed: () =>
+              pushFullScreen<void>(context, const OfflineGameScreen(setup: OfflineGameSetup())),
+          child: const Text('Play the computer'),
+        ),
+      ],
+    ),
+  );
 }
 
 /// Rating, rank and recent results, like the rating cards of the lichess home.
@@ -386,9 +384,9 @@ class _QuickPairingGrid extends ConsumerWidget {
       bool selected = false,
     }) => Material(
       color: selected ? theme.colorScheme.primaryContainer : theme.colorScheme.surfaceContainer,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(6),
@@ -398,12 +396,32 @@ class _QuickPairingGrid extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(top, style: theme.textTheme.titleLarge, maxLines: 1),
-                Text(middle, style: theme.textTheme.titleSmall, maxLines: 1),
+                Text(
+                  top,
+                  maxLines: 1,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                    color: selected ? theme.colorScheme.onPrimaryContainer : null,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  middle.toUpperCase(),
+                  maxLines: 1,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    letterSpacing: 1.1,
+                    fontWeight: FontWeight.w700,
+                    color: selected
+                        ? theme.colorScheme.onPrimaryContainer
+                        : theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 2),
                 Text(
                   bottom,
                   maxLines: 1,
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
@@ -421,9 +439,9 @@ class _QuickPairingGrid extends ConsumerWidget {
         crossAxisCount: 3,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        childAspectRatio: 1.3,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 1.25,
         children: [
           for (final speed in GameSpeed.values)
             for (final size in _quickSizes)
@@ -489,7 +507,7 @@ class _RecentGames extends ConsumerWidget {
                     final won = g.winner != null && g.winner == mine;
                     final lost = g.winner != null && g.winner != mine;
                     final (label, color) = won
-                        ? ('W', Colors.green.shade600)
+                        ? ('W', scheme.secondary)
                         : lost
                         ? ('L', scheme.error)
                         : ('–', scheme.outline);

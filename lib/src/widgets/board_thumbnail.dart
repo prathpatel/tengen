@@ -21,7 +21,7 @@ class BoardThumbnail extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = ref.watch(preferencesProvider.select((p) => p.boardTheme));
+    final prefs = ref.watch(preferencesProvider);
     return ClipRRect(
       borderRadius: BorderRadius.circular(6),
       child: SizedBox.square(
@@ -30,7 +30,9 @@ class BoardThumbnail extends ConsumerWidget {
           child: ExcludeSemantics(
             child: Goban(
               board: board,
-              theme: theme,
+              theme: prefs.boardTheme,
+              blackStones: prefs.blackStones,
+              whiteStones: prefs.whiteStones,
               showCoordinates: false,
               lastMove: lastMove,
               viewport: viewport,

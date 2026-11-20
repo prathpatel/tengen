@@ -57,7 +57,7 @@ class SegmentedChoice<T> extends StatelessWidget {
                       button: true,
                       child: Material(
                         color: choice.value == selected
-                            ? scheme.secondaryContainer
+                            ? scheme.primaryContainer
                             : Colors.transparent,
                         child: InkWell(
                           onTap: enabled ? () => onChanged!(choice.value) : null,
@@ -74,7 +74,7 @@ class SegmentedChoice<T> extends StatelessWidget {
                                         choice.icon,
                                         size: 18,
                                         color: choice.value == selected
-                                            ? scheme.onSecondaryContainer
+                                            ? scheme.onPrimaryContainer
                                             : scheme.onSurface,
                                       ),
                                       const SizedBox(width: 6),
@@ -84,7 +84,7 @@ class SegmentedChoice<T> extends StatelessWidget {
                                       maxLines: 1,
                                       style: theme.textTheme.labelLarge?.copyWith(
                                         color: choice.value == selected
-                                            ? scheme.onSecondaryContainer
+                                            ? scheme.onPrimaryContainer
                                             : scheme.onSurface,
                                         fontWeight: choice.value == selected
                                             ? FontWeight.w700

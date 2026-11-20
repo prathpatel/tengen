@@ -47,7 +47,7 @@ class CardSection extends StatelessWidget {
     // A Material, so that the rows' ink ripples show on the card.
     child: Material(
       color: Theme.of(context).colorScheme.surfaceContainer,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: Column(children: children),
     ),

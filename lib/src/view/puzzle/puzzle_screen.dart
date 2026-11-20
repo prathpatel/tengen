@@ -152,6 +152,8 @@ class _PuzzleBody extends ConsumerWidget {
               board: state.game.board,
               viewport: viewport,
               theme: prefs.boardTheme,
+              blackStones: prefs.blackStones,
+              whiteStones: prefs.whiteStones,
               showCoordinates: prefs.showCoordinates,
               confirmMoves: prefs.confirmMoves,
               lastMove: state.game.position.lastMove?.point,

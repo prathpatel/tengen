@@ -147,6 +147,8 @@ class _CoordinateTrainingScreenState extends ConsumerState<CoordinateTrainingScr
                   Goban(
                     board: Board.empty(_size, _size),
                     theme: prefs.boardTheme,
+                    blackStones: prefs.blackStones,
+                    whiteStones: prefs.whiteStones,
                     showCoordinates: false,
                     toPlay: _running ? StoneColor.black : null,
                     onPlay: _tap,
