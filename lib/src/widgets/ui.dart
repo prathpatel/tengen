@@ -244,7 +244,7 @@ class RoundActionBar extends StatelessWidget {
 }
 
 /// The height of the floating tab bar with its margin, kept clear at the bottom of tab pages.
-const kFloatingBarClearance = 80.0;
+const kFloatingBarClearance = 88.0;
 
 /// The padding of a list that is either a tab page (below the status bar, above the floating
 /// tab bar) or the content of a sheet.
@@ -263,6 +263,7 @@ class GlassPanel extends StatelessWidget {
     this.tint,
     this.opacity = 0.72,
     this.shadow = true,
+    this.blur = true,
     super.key,
   });
 
@@ -278,11 +279,26 @@ class GlassPanel extends StatelessWidget {
   /// shadows would merge into a dark band.
   final bool shadow;
 
+  /// Blurs what is behind. Off for panels in scrolling content: a backdrop blur that scrolls
+  /// can flicker (drawn clear for a frame, then frosted) on some phones.
+  final bool blur;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final dark = scheme.brightness == Brightness.dark;
     final shape = BorderRadius.circular(radius);
+    final panel = Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: (tint ?? scheme.surfaceContainerHigh).withValues(alpha: opacity),
+        borderRadius: shape,
+        border: Border.all(
+          color: (dark ? Colors.white : Colors.black).withValues(alpha: dark ? 0.07 : 0.05),
+        ),
+      ),
+      child: child,
+    );
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: shape,
@@ -297,20 +313,9 @@ class GlassPanel extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: shape,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Container(
-            padding: padding,
-            decoration: BoxDecoration(
-              color: (tint ?? scheme.surfaceContainerHigh).withValues(alpha: opacity),
-              borderRadius: shape,
-              border: Border.all(
-                color: (dark ? Colors.white : Colors.black).withValues(alpha: dark ? 0.07 : 0.05),
-              ),
-            ),
-            child: child,
-          ),
-        ),
+        child: blur
+            ? BackdropFilter(filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18), child: panel)
+            : panel,
       ),
     );
   }

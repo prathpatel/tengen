@@ -196,75 +196,107 @@ class _FadingPageState extends State<_FadingPage> {
   );
 }
 
-/// The floating glass bar: a round button per tab, then your avatar. The highlight slides to
-/// the selected tab, stretching like a drop of liquid on the way, and the icon pops.
+/// The floating glass bar, as in Telegram: a wide pill with an icon and a label per tab, and
+/// your avatar last. A lighter glass lens sits under the selected tab and slides to the next
+/// one, stretching on the way; the selected icon and label take the accent color.
 class _TabBar extends ConsumerWidget {
   const _TabBar({required this.selected, required this.onSelect});
 
   final ShellTab selected;
   final ValueChanged<ShellTab> onSelect;
 
-  static const _item = 44.0;
-  static const _gap = 2.0;
+  static const _height = 62.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final auth = ref.watch(authProvider).value;
-    return GlassPanel(
-      radius: 28,
-      opacity: 0.62,
-      padding: const EdgeInsets.all(4),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: ShellTab.values.length * (_item + _gap),
-            height: _item,
-            child: Stack(
-              children: [
-                _LiquidIndicator(
-                  index: selected.index,
-                  extent: _item + _gap,
-                  size: _item,
-                  color: scheme.onSurface.withValues(alpha: 0.14),
-                ),
-                Row(
+    final user = auth?.isSignedIn ?? false ? auth!.user : null;
+    final items = ShellTab.values.length + 1;
+    Widget label(String text, bool on) => AnimatedDefaultTextStyle(
+      duration: const Duration(milliseconds: 220),
+      style: theme.textTheme.labelSmall!.copyWith(
+        fontSize: 11,
+        color: on ? scheme.primary : scheme.onSurfaceVariant,
+        fontWeight: on ? FontWeight.w600 : FontWeight.w500,
+      ),
+      child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis),
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: GlassPanel(
+          radius: _height / 2,
+          opacity: 0.55,
+          padding: const EdgeInsets.all(4),
+          child: SizedBox(
+            height: _height - 8,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final itemWidth = constraints.maxWidth / items;
+                return Stack(
                   children: [
-                    for (final tab in ShellTab.values) ...[
-                      Semantics(
-                        button: true,
-                        selected: tab == selected,
-                        label: tab.label,
-                        excludeSemantics: true,
-                        child: Tooltip(
-                          message: tab.label,
-                          child: Pressable(
-                            onTap: () => onSelect(tab),
-                            child: SizedBox.square(
-                              dimension: _item,
-                              child: _TabIcon(
-                                selected: tab == selected,
-                                icon: tab.icons.$1,
-                                selectedIcon: tab.icons.$2,
+                    _LiquidIndicator(
+                      index: selected.index,
+                      extent: itemWidth,
+                      width: itemWidth,
+                      height: _height - 8,
+                    ),
+                    Row(
+                      children: [
+                        for (final tab in ShellTab.values)
+                          SizedBox(
+                            width: itemWidth,
+                            child: Semantics(
+                              button: true,
+                              selected: tab == selected,
+                              label: tab.label,
+                              excludeSemantics: true,
+                              child: Tooltip(
+                                message: tab.label,
+                                child: Pressable(
+                                  onTap: () => onSelect(tab),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      _TabIcon(
+                                        selected: tab == selected,
+                                        icon: tab.icons.$1,
+                                        selectedIcon: tab.icons.$2,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      label(tab.label, tab == selected),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
                           ),
+                        SizedBox(
+                          width: itemWidth,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              AccountAvatar(
+                                user: user,
+                                size: 26,
+                                onTap: () => showAccountSheet(context),
+                              ),
+                              const SizedBox(height: 2),
+                              label(user == null ? 'Account' : 'You', false),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: _gap),
-                    ],
+                      ],
+                    ),
                   ],
-                ),
-              ],
+                );
+              },
             ),
           ),
-          AccountAvatar(
-            user: auth?.isSignedIn ?? false ? auth!.user : null,
-            size: _item,
-            onTap: () => showAccountSheet(context),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -293,30 +325,30 @@ class _TabIcon extends StatelessWidget {
         child: Icon(
           selected ? selectedIcon : icon,
           key: ValueKey(selected),
-          size: 22,
-          color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
+          size: 24,
+          color: selected ? scheme.primary : scheme.onSurfaceVariant,
         ),
       ),
     );
   }
 }
 
-/// A pill under the selected tab. When the selection moves, its leading edge goes first and
-/// its trailing edge follows, so it stretches and then gathers at its new place.
+/// A glass lens under the selected tab. When the selection moves, its leading edge goes first
+/// and its trailing edge follows, so it stretches and then gathers at its new place.
 class _LiquidIndicator extends StatefulWidget {
   const _LiquidIndicator({
     required this.index,
     required this.extent,
-    required this.size,
-    required this.color,
+    required this.width,
+    required this.height,
   });
 
   final int index;
 
   /// The distance from one tab to the next.
   final double extent;
-  final double size;
-  final Color color;
+  final double width;
+  final double height;
 
   @override
   State<_LiquidIndicator> createState() => _LiquidIndicatorState();
@@ -325,7 +357,7 @@ class _LiquidIndicator extends StatefulWidget {
 class _LiquidIndicatorState extends State<_LiquidIndicator> with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 460),
+    duration: const Duration(milliseconds: 480),
     value: 1,
   );
   late int _from = widget.index;
@@ -337,7 +369,6 @@ class _LiquidIndicatorState extends State<_LiquidIndicator> with SingleTickerPro
   void didUpdateWidget(_LiquidIndicator oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.index != widget.index) {
-      // From where the pill is now, if it was still moving.
       _from = oldWidget.index;
       if (MediaQuery.disableAnimationsOf(context)) {
         _controller.value = 1;
@@ -354,32 +385,48 @@ class _LiquidIndicatorState extends State<_LiquidIndicator> with SingleTickerPro
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _controller,
-    builder: (context, _) {
-      final t = _controller.value;
-      final from = _from * widget.extent;
-      final to = widget.index * widget.extent;
-      final right = to > from;
-      final lead = _lead.transform(t);
-      final trail = _trail.transform(t);
-      // Moving right, the right edge leads; moving left, the left edge does.
-      final left = from + (to - from) * (right ? trail : lead);
-      final end = from + (to - from) * (right ? lead : trail) + widget.size;
-      return Positioned(
-        left: left,
-        top: 0,
-        width: math.max(widget.size * 0.6, end - left),
-        height: widget.size,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: widget.color,
-            borderRadius: BorderRadius.circular(widget.size / 2),
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = scheme.brightness == Brightness.dark;
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final t = _controller.value;
+        final from = _from * widget.extent;
+        final to = widget.index * widget.extent;
+        final right = to > from;
+        final lead = _lead.transform(t);
+        final trail = _trail.transform(t);
+        // Moving right, the right edge leads; moving left, the left edge does.
+        final left = from + (to - from) * (right ? trail : lead);
+        final end = from + (to - from) * (right ? lead : trail) + widget.width;
+        // A little taller while it moves, like a drop lifted off the glass.
+        final moving = math.sin(t * math.pi);
+        return Positioned(
+          left: left,
+          top: -2 * moving,
+          width: math.max(widget.width * 0.6, end - left),
+          height: widget.height + 4 * moving,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: (dark ? Colors.white : Colors.black).withValues(alpha: dark ? 0.1 : 0.06),
+              borderRadius: BorderRadius.circular(widget.height / 2),
+              border: Border.all(
+                color: (dark ? Colors.white : Colors.black).withValues(alpha: dark ? 0.12 : 0.06),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: dark ? 0.25 : 0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
           ),
-        ),
-      );
-    },
-  );
+        );
+      },
+    );
+  }
 }
 
 /// Shown above the tab bar while the automatch looks for an opponent.

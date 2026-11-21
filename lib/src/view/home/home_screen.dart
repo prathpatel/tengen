@@ -231,6 +231,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ],
                 ),
               ),
+              // Once the page scrolls, a fade behind the status bar keeps the time readable.
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                height: top + 12,
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: _scroll,
+                    builder: (context, _) {
+                      final offset = _scroll.hasClients ? _scroll.offset : 0.0;
+                      return Opacity(
+                        opacity: ((offset - 40) / 120).clamp(0.0, 1.0),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              stops: const [0, 0.7, 1],
+                              colors: [
+                                scheme.surface,
+                                scheme.surface.withValues(alpha: 0.85),
+                                scheme.surface.withValues(alpha: 0),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
             ],
           );
         },
@@ -439,6 +471,7 @@ class _Chip extends StatelessWidget {
             tint: Colors.black,
             opacity: 0.12,
             shadow: false,
+            blur: false,
             child: Stack(
               children: [
                 // The light fill fades and grows in under the selected chip.
@@ -517,7 +550,7 @@ class _PillButton extends StatelessWidget {
       child: Pressable(
         onTap: onTap,
         child: glass
-            ? GlassPanel(radius: 30, opacity: 0.6, child: content)
+            ? GlassPanel(radius: 30, opacity: 0.6, blur: false, child: content)
             : DecoratedBox(
                 decoration: ShapeDecoration(
                   color: scheme.onSurface,
