@@ -140,4 +140,13 @@ void main() {
     expect(find.byType(Dialog), findsNothing);
     expect(find.text('W+R'), findsNothing);
   });
+
+  testWidgets('a keyboard opened over the game does not shrink the board', (tester) async {
+    await pumpScreen(tester, confirmMoves: false);
+    final before = tester.getRect(find.byType(Goban));
+    tester.view.viewInsets = const FakeViewPadding(bottom: 900);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pump();
+    expect(tester.getRect(find.byType(Goban)), before);
+  });
 }

@@ -168,6 +168,8 @@ class _OnlineGameScreenState extends ConsumerState<OnlineGameScreen> {
     return Scaffold(
       // The warmer, lighter tone of the game screens.
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+      // A keyboard opened by a sheet over the game (the chat) must not squeeze the board.
+      resizeToAvoidBottomInset: false,
       appBar: TopBar(
         title: value == null ? 'Game $gameId' : _title(value),
         subtitle: !connected ? 'Reconnecting…' : (value == null ? null : _subtitle(value)),

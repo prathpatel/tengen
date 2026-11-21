@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/model/auth/auth_controller.dart';
@@ -132,8 +134,12 @@ class _GameChatSheetState extends ConsumerState<GameChatSheet> {
       }
     }
 
+    // The chat keeps its height above the keyboard, as far as the screen allows.
+    final screen = MediaQuery.sizeOf(context).height;
+    final room = screen - bottomInset - MediaQuery.paddingOf(context).top - 48;
+    final content = math.min(screen * 0.62, math.max(220.0, room));
     return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.62,
+      height: content + bottomInset,
       child: Padding(
         padding: EdgeInsets.only(bottom: bottomInset),
         child: Column(
@@ -155,9 +161,29 @@ class _GameChatSheetState extends ConsumerState<GameChatSheet> {
             Expanded(
               child: chat.isEmpty
                   ? Center(
-                      child: Text(
-                        'No messages yet',
-                        style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            size: 32,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'No messages yet',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                          if (signedIn)
+                            Text(
+                              isPlayer ? 'Say hello to your opponent' : 'Be the first to write',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                        ],
                       ),
                     )
                   : ListView(
