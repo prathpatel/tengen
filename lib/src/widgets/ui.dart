@@ -244,7 +244,7 @@ class RoundActionBar extends StatelessWidget {
 }
 
 /// The height of the floating tab bar with its margin, kept clear at the bottom of tab pages.
-const kFloatingBarClearance = 96.0;
+const kFloatingBarClearance = 80.0;
 
 /// The padding of a list that is either a tab page (below the status bar, above the floating
 /// tab bar) or the content of a sheet.
@@ -262,6 +262,7 @@ class GlassPanel extends StatelessWidget {
     this.padding = EdgeInsets.zero,
     this.tint,
     this.opacity = 0.72,
+    this.shadow = true,
     super.key,
   });
 
@@ -273,6 +274,10 @@ class GlassPanel extends StatelessWidget {
   final Color? tint;
   final double opacity;
 
+  /// A soft drop shadow under the panel; off for small pieces side by side (chips), whose
+  /// shadows would merge into a dark band.
+  final bool shadow;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -282,11 +287,12 @@ class GlassPanel extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: shape,
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: dark ? 0.35 : 0.12),
-            blurRadius: 28,
-            offset: const Offset(0, 10),
-          ),
+          if (shadow)
+            BoxShadow(
+              color: Colors.black.withValues(alpha: dark ? 0.3 : 0.1),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
         ],
       ),
       child: ClipRRect(
@@ -377,7 +383,10 @@ class SectionLabel extends StatelessWidget {
             ),
           ),
           // Shrinks on narrow screens or with large text rather than overflowing.
-          if (trailing != null) Flexible(child: trailing!),
+          if (trailing != null)
+            Flexible(
+              child: Align(alignment: AlignmentDirectional.centerEnd, child: trailing),
+            ),
         ],
       ),
     );

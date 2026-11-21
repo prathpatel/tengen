@@ -437,7 +437,8 @@ class _Chip extends StatelessWidget {
           child: GlassPanel(
             radius: 20,
             tint: Colors.black,
-            opacity: 0.22,
+            opacity: 0.12,
+            shadow: false,
             child: Stack(
               children: [
                 // The light fill fades and grows in under the selected chip.

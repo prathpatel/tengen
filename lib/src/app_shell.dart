@@ -87,6 +87,33 @@ class _AppShellState extends ConsumerState<AppShell> {
                   side: t.index.compareTo(tab.index).toDouble(),
                   child: _page(t),
                 ),
+            // Lists scroll under the status bar: a fade keeps the time and icons readable.
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              height: MediaQuery.paddingOf(context).top + 12,
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  opacity: tab == ShellTab.home ? 0 : 1,
+                  duration: const Duration(milliseconds: 220),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: const [0, 0.7, 1],
+                        colors: [
+                          Theme.of(context).colorScheme.surface,
+                          Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
+                          Theme.of(context).colorScheme.surface.withValues(alpha: 0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
             Positioned(
               left: 0,
               right: 0,
@@ -177,16 +204,17 @@ class _TabBar extends ConsumerWidget {
   final ShellTab selected;
   final ValueChanged<ShellTab> onSelect;
 
-  static const _item = 52.0;
-  static const _gap = 4.0;
+  static const _item = 44.0;
+  static const _gap = 2.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final auth = ref.watch(authProvider).value;
     return GlassPanel(
-      radius: 34,
-      padding: const EdgeInsets.all(6),
+      radius: 28,
+      opacity: 0.62,
+      padding: const EdgeInsets.all(4),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -265,7 +293,7 @@ class _TabIcon extends StatelessWidget {
         child: Icon(
           selected ? selectedIcon : icon,
           key: ValueKey(selected),
-          size: 24,
+          size: 22,
           color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
         ),
       ),
