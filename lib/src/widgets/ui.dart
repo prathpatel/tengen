@@ -747,3 +747,86 @@ class FeedbackCard extends StatelessWidget {
     );
   }
 }
+
+/// Fades and slides its child up into place once, [delay] after it first appears: lists and
+/// sections come in one after another.
+class Entrance extends StatefulWidget {
+  const Entrance({
+    required this.child,
+    this.delay = Duration.zero,
+    this.offset = 24,
+    this.duration = const Duration(milliseconds: 520),
+    super.key,
+  });
+
+  final Widget child;
+  final Duration delay;
+
+  /// How far below its place it starts, in pixels.
+  final double offset;
+  final Duration duration;
+
+  @override
+  State<Entrance> createState() => _EntranceState();
+}
+
+class _EntranceState extends State<Entrance> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: widget.delay + widget.duration,
+  );
+  late final Animation<double> _t = CurvedAnimation(
+    parent: _controller,
+    curve: Interval(
+      widget.delay.inMicroseconds / (widget.delay + widget.duration).inMicroseconds,
+      1,
+      curve: Curves.easeOutCubic,
+    ),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_controller.isDismissed) {
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _controller.value = 1;
+      } else {
+        _controller.forward();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _t,
+    builder: (context, child) => Opacity(
+      opacity: _t.value,
+      child: Transform.translate(offset: Offset(0, widget.offset * (1 - _t.value)), child: child),
+    ),
+    child: widget.child,
+  );
+}
+
+/// A number that counts up to [value] when it appears and moves to a new value smoothly.
+class CountUp extends StatelessWidget {
+  const CountUp({required this.value, required this.builder, super.key});
+
+  final num value;
+  final Widget Function(BuildContext context, int value) builder;
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+    tween: Tween(begin: 0, end: value.toDouble()),
+    duration: MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 1100),
+    curve: Curves.easeOutCubic,
+    builder: (context, v, _) => builder(context, v.round()),
+  );
+}

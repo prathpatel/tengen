@@ -12,6 +12,7 @@ import 'package:tengen/src/model/ogs/user.dart';
 import 'package:tengen/src/model/online_game/automatch_controller.dart';
 import 'package:tengen/src/model/settings/preferences.dart';
 import 'package:tengen/src/utils/navigation.dart';
+import 'package:tengen/src/utils/test_env.dart';
 import 'package:tengen/src/view/auth/sign_in_screen.dart';
 import 'package:tengen/src/view/chat/chat_rooms_screen.dart';
 import 'package:tengen/src/view/home/my_games_screen.dart';
@@ -27,11 +28,38 @@ import 'package:tengen/src/widgets/ui.dart';
 /// The home tab. Your game (or an empty board of the size you would play) fills the top as a
 /// tilted backdrop that fades into the page; over it, the size and speed of your next game,
 /// what is happening (`Your move against kuro_neko`), Continue and New game, and three tiles.
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+
+  /// `Move 22 · 2:14 left · Rated`
+  static String _gameDetail(PlayerGame game, GoGame? built) {
+    final data = game.data;
+    final clock = data?.clock;
+    final parts = [
+      if (built != null) 'Move ${built.moveCount}',
+      if (clock != null && built != null) '${clock.read(built.toMove, DateTime.now()).label} left',
+      if (data != null && data.ranked) 'Rated',
+      if (data != null && !data.ranked) 'Unrated',
+    ];
+    return parts.isEmpty ? '${game.width}×${game.height}' : parts.join(' · ');
+  }
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  /// The backdrop moves at half the speed of the page (parallax).
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final auth = ref.watch(authProvider).value;
     final signedIn = auth?.isSignedIn ?? false;
     final user = auth?.user;
@@ -63,7 +91,7 @@ class HomeScreen extends ConsumerWidget {
       (final PlayerGame game?, _) => (
         '${game.isTurnOf(user!.id) ? 'Your move' : 'Their move'}\n'
             'against ${(game.black.id == user.id ? game.white : game.black).username}',
-        _gameDetail(game, currentGame),
+        HomeScreen._gameDetail(game, currentGame),
         _PillButton.primary(
           icon: Icons.play_arrow_rounded,
           label: 'Continue',
@@ -106,19 +134,33 @@ class HomeScreen extends ConsumerWidget {
                 right: 0,
                 top: 0,
                 height: height * 0.66,
-                child: GestureDetector(
-                  onTap: current == null
-                      ? null
-                      : () => pushFullScreen<void>(context, OnlineGameScreen(gameId: current.id)),
-                  child: _Backdrop(
-                    key: ValueKey(current?.id ?? 0),
-                    board: backdropBoard,
-                    lastMove: currentGame?.position.lastMove?.point,
-                    prefs: prefs,
+                child: AnimatedBuilder(
+                  animation: _scroll,
+                  builder: (context, child) => Transform.translate(
+                    offset: Offset(
+                      0,
+                      -0.45 * (_scroll.hasClients ? math.max(0.0, _scroll.offset) : 0),
+                    ),
+                    child: child,
+                  ),
+                  child: GestureDetector(
+                    onTap: current == null
+                        ? null
+                        : () => pushFullScreen<void>(context, OnlineGameScreen(gameId: current.id)),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 700),
+                      child: _Backdrop(
+                        key: ValueKey(current?.id ?? 0),
+                        board: backdropBoard,
+                        lastMove: currentGame?.position.lastMove?.point,
+                        prefs: prefs,
+                      ),
+                    ),
                   ),
                 ),
               ),
               SingleChildScrollView(
+                controller: _scroll,
                 padding: EdgeInsets.only(
                   top: top + 12,
                   bottom: MediaQuery.paddingOf(context).bottom + kFloatingBarClearance + 16,
@@ -126,41 +168,63 @@ class HomeScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _NextGameChips(signedIn: signedIn),
+                    Entrance(child: _NextGameChips(signedIn: signedIn)),
                     SizedBox(height: (height * 0.25).clamp(48.0, 300.0)),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 300),
-                        child: Column(
+                        duration: const Duration(milliseconds: 450),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeIn,
+                        transitionBuilder: (child, animation) => FadeTransition(
+                          opacity: animation,
+                          child: SlideTransition(
+                            position: Tween(
+                              begin: const Offset(0, 0.12),
+                              end: Offset.zero,
+                            ).animate(animation),
+                            child: child,
+                          ),
+                        ),
+                        layoutBuilder: (current, previous) =>
+                            Stack(alignment: Alignment.topLeft, children: [...previous, ?current]),
+                        child: Entrance(
                           key: ValueKey(headline),
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              headline,
-                              style: theme.textTheme.displaySmall?.copyWith(
-                                fontSize: 34,
-                                height: 1.12,
-                                color: scheme.onSurface,
-                                shadows: const [Shadow(color: Color(0x99000000), blurRadius: 18)],
+                          delay: const Duration(milliseconds: 90),
+                          offset: 32,
+                          child: Column(
+                            key: ValueKey(headline),
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                headline,
+                                style: theme.textTheme.displaySmall?.copyWith(
+                                  fontSize: 34,
+                                  height: 1.12,
+                                  color: scheme.onSurface,
+                                  shadows: const [Shadow(color: Color(0x99000000), blurRadius: 18)],
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              detail,
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                color: scheme.onSurface.withValues(alpha: 0.75),
-                                shadows: const [Shadow(color: Color(0x99000000), blurRadius: 12)],
+                              const SizedBox(height: 10),
+                              Text(
+                                detail,
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  color: scheme.onSurface.withValues(alpha: 0.75),
+                                  shadows: const [Shadow(color: Color(0x99000000), blurRadius: 12)],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 22),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Wrap(spacing: 10, runSpacing: 10, children: [primary, secondary]),
+                    Entrance(
+                      delay: const Duration(milliseconds: 180),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Wrap(spacing: 10, runSpacing: 10, children: [primary, secondary]),
+                      ),
                     ),
                     const SizedBox(height: 26),
                     _YourGo(heroGameId: current?.id),
@@ -172,19 +236,6 @@ class HomeScreen extends ConsumerWidget {
         },
       ),
     );
-  }
-
-  /// `Move 22 · 2:14 left · Rated`
-  static String _gameDetail(PlayerGame game, GoGame? built) {
-    final data = game.data;
-    final clock = data?.clock;
-    final parts = [
-      if (built != null) 'Move ${built.moveCount}',
-      if (clock != null && built != null) '${clock.read(built.toMove, DateTime.now()).label} left',
-      if (data != null && data.ranked) 'Rated',
-      if (data != null && !data.ranked) 'Unrated',
-    ];
-    return parts.isEmpty ? '${game.width}×${game.height}' : parts.join(' · ');
   }
 }
 
@@ -228,12 +279,38 @@ final _openingBoard = Board.empty(19, 19)
 
 /// The board, large and tilted, fading into the page below and darkened at the top for the
 /// status bar.
-class _Backdrop extends StatelessWidget {
+class _Backdrop extends StatefulWidget {
   const _Backdrop({required this.board, required this.lastMove, required this.prefs, super.key});
 
   final Board board;
   final Point? lastMove;
   final Preferences prefs;
+
+  @override
+  State<_Backdrop> createState() => _BackdropState();
+}
+
+/// The backdrop drifts slowly, as if a camera moved over the board.
+class _BackdropState extends State<_Backdrop> with SingleTickerProviderStateMixin {
+  late final AnimationController _drift = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 26),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Endless: off in tests (they could not settle) and when animations are reduced.
+    if (!inFlutterTest && !MediaQuery.disableAnimationsOf(context) && !_drift.isAnimating) {
+      _drift.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _drift.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -249,19 +326,29 @@ class _Backdrop extends StatelessWidget {
                 maxWidth: size,
                 maxHeight: size,
                 alignment: const Alignment(0.1, -0.2),
-                child: Transform.rotate(
-                  angle: -0.14,
-                  child: SizedBox.square(
-                    dimension: size,
-                    child: IgnorePointer(
-                      child: ExcludeSemantics(
-                        child: Goban(
-                          board: board,
-                          lastMove: lastMove,
-                          theme: prefs.boardTheme,
-                          blackStones: prefs.blackStones,
-                          whiteStones: prefs.whiteStones,
-                          showCoordinates: false,
+                child: AnimatedBuilder(
+                  animation: _drift,
+                  builder: (context, child) {
+                    final t = Curves.easeInOutSine.transform(_drift.value);
+                    return Transform.translate(
+                      offset: Offset(18 * t - 9, 10 * t - 5),
+                      child: Transform.scale(scale: 1 + 0.06 * t, child: child),
+                    );
+                  },
+                  child: Transform.rotate(
+                    angle: -0.14,
+                    child: SizedBox.square(
+                      dimension: size,
+                      child: IgnorePointer(
+                        child: ExcludeSemantics(
+                          child: Goban(
+                            board: widget.board,
+                            lastMove: widget.lastMove,
+                            theme: widget.prefs.boardTheme,
+                            blackStones: widget.prefs.blackStones,
+                            whiteStones: widget.prefs.whiteStones,
+                            showCoordinates: false,
+                          ),
                         ),
                       ),
                     ),
@@ -339,10 +426,7 @@ class _Chip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final text = theme.textTheme.bodyLarge?.copyWith(
-      color: selected ? scheme.surface : Colors.white,
-      fontWeight: FontWeight.w500,
-    );
+    const duration = Duration(milliseconds: 260);
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: Semantics(
@@ -350,23 +434,45 @@ class _Chip extends StatelessWidget {
         selected: selected,
         child: Pressable(
           onTap: onTap,
-          child: selected
-              ? AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                  decoration: ShapeDecoration(
-                    color: scheme.onSurface,
-                    shape: const StadiumBorder(),
+          child: GlassPanel(
+            radius: 20,
+            tint: Colors.black,
+            opacity: 0.22,
+            child: Stack(
+              children: [
+                // The light fill fades and grows in under the selected chip.
+                Positioned.fill(
+                  child: AnimatedOpacity(
+                    opacity: selected ? 1 : 0,
+                    duration: duration,
+                    curve: Curves.easeOut,
+                    child: AnimatedScale(
+                      scale: selected ? 1 : 0.6,
+                      duration: duration,
+                      curve: Curves.easeOutBack,
+                      child: DecoratedBox(
+                        decoration: ShapeDecoration(
+                          color: scheme.onSurface,
+                          shape: const StadiumBorder(),
+                        ),
+                      ),
+                    ),
                   ),
-                  child: Text(label, style: text),
-                )
-              : GlassPanel(
-                  radius: 20,
-                  tint: Colors.black,
-                  opacity: 0.22,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                  child: Text(label, style: text),
                 ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                  child: AnimatedDefaultTextStyle(
+                    duration: duration,
+                    style: theme.textTheme.bodyLarge!.copyWith(
+                      color: selected ? scheme.surface : Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    child: Text(label),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -452,11 +558,14 @@ class _YourGo extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _RecordCard(
-          rank: (me ?? user).rankLabel,
-          rating: me?.rating,
-          stats: stats,
-          form: [for (final g in finished.take(10)) _outcomeFor(g, user.id)],
+        Entrance(
+          delay: const Duration(milliseconds: 260),
+          child: _RecordCard(
+            rank: (me ?? user).rankLabel,
+            rating: me?.rating,
+            stats: stats,
+            form: [for (final g in finished.take(10)) _outcomeFor(g, user.id)],
+          ),
         ),
         if (others.isNotEmpty) ...[
           _SectionHeader(
@@ -471,7 +580,10 @@ class _YourGo extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               itemCount: others.length,
               separatorBuilder: (_, _) => const SizedBox(width: 10),
-              itemBuilder: (context, i) => _OngoingCard(game: others[i], userId: user.id),
+              itemBuilder: (context, i) => Entrance(
+                delay: Duration(milliseconds: 320 + 70 * i),
+                child: _OngoingCard(game: others[i], userId: user.id),
+              ),
             ),
           ),
         ],
@@ -487,7 +599,14 @@ class _YourGo extends ConsumerWidget {
               'No finished games yet. Your results will show here.',
             ),
             AsyncData(:final value) => _Rounded(
-              children: [for (final g in value.take(5)) _RecentGameRow(game: g, userId: user.id)],
+              children: [
+                for (final (i, g) in value.take(5).indexed)
+                  Entrance(
+                    delay: Duration(milliseconds: 120 + 70 * i),
+                    offset: 14,
+                    child: _RecentGameRow(game: g, userId: user.id),
+                  ),
+              ],
             ),
             AsyncError() => const _Note('Could not load your games.'),
             _ => const Padding(
@@ -543,7 +662,7 @@ class _RecordCard extends StatelessWidget {
     final s = stats;
     final losses = s == null ? null : math.max(0, s.games - s.wins);
     final rate = s == null || s.games == 0 ? null : (s.wins * 100 / s.games).round().clamp(0, 100);
-    Widget stat(String label, String value) => Expanded(
+    Widget stat(String label, Widget value) => Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -552,10 +671,10 @@ class _RecordCard extends StatelessWidget {
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(
-              value,
+            child: DefaultTextStyle.merge(
               maxLines: 1,
               style: theme.textTheme.headlineMedium?.copyWith(fontSize: 26, height: 1.1),
+              child: value,
             ),
           ),
         ],
@@ -568,9 +687,23 @@ class _RecordCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              stat('Rank', rank.isEmpty ? '–' : rank),
-              stat('Rating', rating == null ? '–' : '${rating!.round()}'),
-              stat('Record', s == null ? '…' : '${s.wins}–$losses'),
+              stat('Rank', Text(rank.isEmpty ? '–' : rank)),
+              stat(
+                'Rating',
+                rating == null
+                    ? const Text('–')
+                    : CountUp(value: rating!.round(), builder: (_, v) => Text('$v')),
+              ),
+              stat(
+                'Record',
+                s == null
+                    ? const Text('…')
+                    : CountUp(
+                        value: s.wins,
+                        builder: (_, w) =>
+                            CountUp(value: losses!, builder: (_, l) => Text('$w–$l')),
+                      ),
+              ),
             ],
           ),
           if (form.isNotEmpty) ...[
@@ -587,26 +720,36 @@ class _RecordCard extends StatelessWidget {
                     spacing: 6,
                     runSpacing: 6,
                     children: [
-                      for (final o in form.reversed)
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: switch (o) {
-                              _Outcome.win => scheme.secondary,
-                              _Outcome.loss => scheme.error,
-                              _Outcome.other => scheme.outline,
-                            },
+                      for (final (i, o) in form.reversed.indexed)
+                        // The dots pop in one after another.
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0, end: 1),
+                          duration: Duration(milliseconds: 500 + 60 * i),
+                          curve: Interval((60 * i) / (500 + 60 * i), 1, curve: Curves.elasticOut),
+                          builder: (context, t, child) => Transform.scale(scale: t, child: child),
+                          child: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: switch (o) {
+                                _Outcome.win => scheme.secondary,
+                                _Outcome.loss => scheme.error,
+                                _Outcome.other => scheme.outline,
+                              },
+                            ),
                           ),
                         ),
                     ],
                   ),
                 ),
                 if (rate != null)
-                  Text(
-                    '$rate% won',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                  CountUp(
+                    value: rate,
+                    builder: (_, v) => Text(
+                      '$v% won',
+                      style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
                   ),
               ],
             ),

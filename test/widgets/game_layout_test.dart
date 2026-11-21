@@ -68,6 +68,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(412, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(layout());
+    await tester.pumpAndSettle();
     final top = tester.getRect(find.byType(PlayerPill).first);
     final bottom = tester.getRect(find.byType(PlayerPill).last);
     const actionsTop = 900 - kGameActionsHeight;

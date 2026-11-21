@@ -21,6 +21,8 @@ Future<ProviderContainer> pumpScreen(WidgetTester tester, {required bool confirm
       child: const MaterialApp(home: OfflineGameScreen(setup: setup)),
     ),
   );
+  // The players and actions slide in when the screen opens.
+  await tester.pump(const Duration(seconds: 1));
   return ProviderScope.containerOf(tester.element(find.byType(OfflineGameScreen)));
 }
 

@@ -5,6 +5,7 @@ import 'package:tengen/src/model/go/board.dart';
 import 'package:tengen/src/model/go/coordinates.dart';
 import 'package:tengen/src/model/go/game.dart';
 import 'package:tengen/src/model/go/scoring.dart';
+import 'package:tengen/src/widgets/ui.dart';
 
 /// `Black to play`, or `Move 12 · White D4` / `Move 13 · Black passed`.
 String moveSummary(GoGame game) {
@@ -58,6 +59,14 @@ class GameLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The players and the actions slide softly into place when the screen opens.
+    final above = Entrance(offset: -16, child: this.above);
+    final below = Entrance(delay: const Duration(milliseconds: 80), child: this.below);
+    final actions = Entrance(
+      delay: const Duration(milliseconds: 160),
+      offset: 40,
+      child: this.actions,
+    );
     // The board sits inset, with rounded corners and a soft shadow.
     final board = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),

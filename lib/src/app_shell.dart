@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/model/auth/auth_controller.dart';
@@ -77,7 +79,14 @@ class _AppShellState extends ConsumerState<AppShell> {
           children: [
             for (final t in ShellTab.values)
               if (_opened.contains(t))
-                _FadingPage(key: ValueKey(t), active: t == tab, child: _page(t)),
+                _FadingPage(
+                  key: ValueKey(t),
+                  active: t == tab,
+                  // The pages slide the way the tabs are laid out: a tab to the right comes in
+                  // from the right.
+                  side: t.index.compareTo(tab.index).toDouble(),
+                  child: _page(t),
+                ),
             Positioned(
               left: 0,
               right: 0,
@@ -115,9 +124,12 @@ class _AppShellState extends ConsumerState<AppShell> {
 /// A tab: it fades in when selected, and out of sight (and of finders and screen readers) when
 /// another is.
 class _FadingPage extends StatefulWidget {
-  const _FadingPage({required this.active, required this.child, super.key});
+  const _FadingPage({required this.active, required this.side, required this.child, super.key});
 
   final bool active;
+
+  /// Where the page waits when it is not shown: -1 left of the selected tab, 1 right of it.
+  final double side;
   final Widget child;
 
   @override
@@ -145,9 +157,9 @@ class _FadingPageState extends State<_FadingPage> {
         onEnd: () {
           if (!widget.active && mounted) setState(() => _hidden = true);
         },
-        child: AnimatedScale(
-          scale: widget.active ? 1 : 0.985,
-          duration: const Duration(milliseconds: 260),
+        child: AnimatedSlide(
+          offset: Offset(widget.active ? 0 : widget.side * 0.12, 0),
+          duration: const Duration(milliseconds: 340),
           curve: Curves.easeOutCubic,
           // The page's own animations pause while it is out of sight.
           child: TickerMode(enabled: widget.active, child: widget.child),
@@ -157,12 +169,16 @@ class _FadingPageState extends State<_FadingPage> {
   );
 }
 
-/// The floating glass bar: a round button per tab, then your avatar.
+/// The floating glass bar: a round button per tab, then your avatar. The highlight slides to
+/// the selected tab, stretching like a drop of liquid on the way, and the icon pops.
 class _TabBar extends ConsumerWidget {
   const _TabBar({required this.selected, required this.onSelect});
 
   final ShellTab selected;
   final ValueChanged<ShellTab> onSelect;
+
+  static const _item = 52.0;
+  static const _gap = 4.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -174,47 +190,168 @@ class _TabBar extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          for (final tab in ShellTab.values) ...[
-            Semantics(
-              button: true,
-              selected: tab == selected,
-              label: tab.label,
-              excludeSemantics: true,
-              child: Tooltip(
-                message: tab.label,
-                child: Pressable(
-                  onTap: () => onSelect(tab),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 240),
-                    curve: Curves.easeOutCubic,
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: tab == selected
-                          ? scheme.onSurface.withValues(alpha: 0.14)
-                          : Colors.transparent,
-                    ),
-                    child: Icon(
-                      tab == selected ? tab.icons.$2 : tab.icons.$1,
-                      size: 24,
-                      color: tab == selected ? scheme.onSurface : scheme.onSurfaceVariant,
-                    ),
-                  ),
+          SizedBox(
+            width: ShellTab.values.length * (_item + _gap),
+            height: _item,
+            child: Stack(
+              children: [
+                _LiquidIndicator(
+                  index: selected.index,
+                  extent: _item + _gap,
+                  size: _item,
+                  color: scheme.onSurface.withValues(alpha: 0.14),
                 ),
-              ),
+                Row(
+                  children: [
+                    for (final tab in ShellTab.values) ...[
+                      Semantics(
+                        button: true,
+                        selected: tab == selected,
+                        label: tab.label,
+                        excludeSemantics: true,
+                        child: Tooltip(
+                          message: tab.label,
+                          child: Pressable(
+                            onTap: () => onSelect(tab),
+                            child: SizedBox.square(
+                              dimension: _item,
+                              child: _TabIcon(
+                                selected: tab == selected,
+                                icon: tab.icons.$1,
+                                selectedIcon: tab.icons.$2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: _gap),
+                    ],
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(width: 4),
-          ],
+          ),
           AccountAvatar(
             user: auth?.isSignedIn ?? false ? auth!.user : null,
-            size: 52,
+            size: _item,
             onTap: () => showAccountSheet(context),
           ),
         ],
       ),
     );
   }
+}
+
+/// The selected tab's icon pops a little when chosen; the others are muted.
+class _TabIcon extends StatelessWidget {
+  const _TabIcon({required this.selected, required this.icon, required this.selectedIcon});
+
+  final bool selected;
+  final IconData icon;
+  final IconData selectedIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return TweenAnimationBuilder<double>(
+      // A new key restarts the pop each time the tab is selected.
+      key: ValueKey(selected),
+      tween: Tween(begin: selected ? 0.7 : 1, end: 1),
+      duration: Duration(milliseconds: selected ? 520 : 1),
+      curve: Curves.elasticOut,
+      builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        child: Icon(
+          selected ? selectedIcon : icon,
+          key: ValueKey(selected),
+          size: 24,
+          color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+/// A pill under the selected tab. When the selection moves, its leading edge goes first and
+/// its trailing edge follows, so it stretches and then gathers at its new place.
+class _LiquidIndicator extends StatefulWidget {
+  const _LiquidIndicator({
+    required this.index,
+    required this.extent,
+    required this.size,
+    required this.color,
+  });
+
+  final int index;
+
+  /// The distance from one tab to the next.
+  final double extent;
+  final double size;
+  final Color color;
+
+  @override
+  State<_LiquidIndicator> createState() => _LiquidIndicatorState();
+}
+
+class _LiquidIndicatorState extends State<_LiquidIndicator> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 460),
+    value: 1,
+  );
+  late int _from = widget.index;
+
+  static const _lead = Interval(0, 0.7, curve: Curves.easeOutCubic);
+  static const _trail = Interval(0.22, 1, curve: Curves.easeOutBack);
+
+  @override
+  void didUpdateWidget(_LiquidIndicator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.index != widget.index) {
+      // From where the pill is now, if it was still moving.
+      _from = oldWidget.index;
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _controller.value = 1;
+      } else {
+        _controller.forward(from: 0);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _controller,
+    builder: (context, _) {
+      final t = _controller.value;
+      final from = _from * widget.extent;
+      final to = widget.index * widget.extent;
+      final right = to > from;
+      final lead = _lead.transform(t);
+      final trail = _trail.transform(t);
+      // Moving right, the right edge leads; moving left, the left edge does.
+      final left = from + (to - from) * (right ? trail : lead);
+      final end = from + (to - from) * (right ? lead : trail) + widget.size;
+      return Positioned(
+        left: left,
+        top: 0,
+        width: math.max(widget.size * 0.6, end - left),
+        height: widget.size,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: widget.color,
+            borderRadius: BorderRadius.circular(widget.size / 2),
+          ),
+        ),
+      );
+    },
+  );
 }
 
 /// Shown above the tab bar while the automatch looks for an opponent.

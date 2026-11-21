@@ -207,21 +207,52 @@ class GobanGeometry {
   }
 }
 
-class _GobanState extends State<Goban> {
+class _GobanState extends State<Goban> with SingleTickerProviderStateMixin {
   Point? _preview;
+
+  /// A new stone settles onto the board, and the stones it captured fade away.
+  late final AnimationController _move = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 320),
+    value: 1,
+  );
+  Point? _placed;
+  Map<Point, StoneColor> _captured = const {};
+
+  @override
+  void dispose() {
+    _move.dispose();
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(Goban oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.board != widget.board || widget.toPlay == null) _preview = null;
     final last = widget.lastMove;
-    if (widget.sound &&
+    final old = oldWidget.board;
+    final board = widget.board;
+    final placed =
         last != null &&
         last != oldWidget.lastMove &&
-        widget.board.contains(last) &&
-        widget.board[last] != null &&
-        (!oldWidget.board.contains(last) || oldWidget.board[last] == null)) {
-      StoneSound.play(widget.board[last]!);
+        board.contains(last) &&
+        board[last] != null &&
+        (!old.contains(last) || old[last] == null);
+    if (placed) {
+      if (widget.sound) StoneSound.play(board[last]!);
+      final sameSize = old.width == board.width && old.height == board.height;
+      _placed = last;
+      _captured = {
+        if (sameSize)
+          for (final p in old.points)
+            if (old[p] != null && board[p] == null) p: old[p]!,
+      };
+      if (!MediaQuery.disableAnimationsOf(context)) _move.forward(from: 0);
+    } else if (oldWidget.board != widget.board) {
+      // Moving through the game, or a new one: no animation.
+      _placed = null;
+      _captured = const {};
+      _move.value = 1;
     }
   }
 
@@ -291,6 +322,9 @@ class _GobanState extends State<Goban> {
                   previewColor: widget.toPlay,
                   deadStones: widget.deadStones,
                   territory: widget.territory,
+                  move: _move,
+                  placed: _placed,
+                  captured: _captured,
                 ),
               ),
             ),
@@ -317,7 +351,15 @@ class _GobanPainter extends CustomPainter {
     required this.previewColor,
     required this.deadStones,
     required this.territory,
-  }) : super(repaint: GobanArt.instance);
+    required this.move,
+    required this.placed,
+    required this.captured,
+  }) : super(repaint: Listenable.merge([GobanArt.instance, move]));
+
+  /// The progress of the last move's animation (1 when done).
+  final Animation<double> move;
+  final Point? placed;
+  final Map<Point, StoneColor> captured;
 
   final Board board;
   final GobanViewport viewport;
@@ -393,11 +435,34 @@ class _GobanPainter extends CustomPainter {
       }
     }
 
-    // Stones.
+    // Stones. The last one placed drops in: from a little large and light to its place.
+    final progress = move.value;
+    final drop = Curves.easeOutCubic.transform(progress);
     for (final p in board.points.where(vp.contains)) {
       final color = board[p];
       if (color == null) continue;
-      _paintStone(canvas, p, color, opacity: deadStones.contains(p) ? 0.45 : 1);
+      if (p == placed && progress < 1) {
+        _paintStone(
+          canvas,
+          p,
+          color,
+          opacity: 0.35 + 0.65 * drop,
+          scale: 1.22 - 0.22 * drop,
+          lift: 1 - drop,
+        );
+      } else {
+        final dead = deadStones.contains(p);
+        _paintStone(canvas, p, color, opacity: dead ? 0.45 : 1, dead: dead);
+      }
+    }
+    // The stones it captured shrink and fade away.
+    if (progress < 1) {
+      final fade = Curves.easeIn.transform(progress);
+      for (final MapEntry(key: p, value: color) in captured.entries) {
+        if (vp.contains(p) && board[p] == null) {
+          _paintStone(canvas, p, color, opacity: (1 - fade) * 0.9, scale: 1 - 0.3 * fade);
+        }
+      }
     }
 
     for (final (p, alpha) in [(pendingMove, 0.7), (preview, 0.5)]) {
@@ -414,14 +479,20 @@ class _GobanPainter extends CustomPainter {
     final last = lastMove;
     if (last != null && board[last] != null && !marks.containsKey(last)) {
       final stone = board[last]!;
+      // The ring appears once the stone has landed.
+      final ring = last == placed
+          ? Curves.easeOut.transform(((progress - 0.45) / 0.55).clamp(0, 1))
+          : 1.0;
       canvas.drawCircle(
         geometry.offsetOf(last),
-        cell * 0.22,
+        cell * (0.14 + 0.08 * ring),
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = math.max(2, cell * 0.08)
           // The opposite color of the stone, so that it reads on every board.
-          ..color = stone == StoneColor.black ? Colors.white : Colors.black,
+          ..color = (stone == StoneColor.black ? Colors.white : Colors.black).withValues(
+            alpha: ring,
+          ),
       );
     }
   }
@@ -445,10 +516,19 @@ class _GobanPainter extends CustomPainter {
     canvas.restore();
   }
 
-  void _paintStone(Canvas canvas, Point p, StoneColor color, {double opacity = 1}) {
+  void _paintStone(
+    Canvas canvas,
+    Point p,
+    StoneColor color, {
+    double opacity = 1,
+    double scale = 1,
+    double lift = 0,
+    bool dead = false,
+  }) {
     final cell = geometry.cell;
-    final center = geometry.offsetOf(p);
-    final radius = cell * 0.48;
+    // Lifted: drawn a little higher, as if still falling onto the board.
+    final center = geometry.offsetOf(p) - Offset(0, cell * 0.18 * lift);
+    final radius = cell * 0.48 * scale;
     paintStone(
       canvas,
       center: center,
@@ -460,7 +540,7 @@ class _GobanPainter extends CustomPainter {
       variant: (p.x * 7 + p.y * 13 + p.x * p.y) % kShellVariants,
       opacity: opacity,
     );
-    if (opacity < 1 && opacity <= 0.45) {
+    if (dead) {
       // Dead stone cross.
       final paint = Paint()
         ..color = (color == StoneColor.black ? Colors.white : Colors.black).withValues(alpha: 0.8)
@@ -584,5 +664,7 @@ class _GobanPainter extends CustomPainter {
       old.previewColor != previewColor ||
       old.deadStones != deadStones ||
       old.territory != territory ||
+      old.placed != placed ||
+      old.captured != captured ||
       old.geometry.cell != geometry.cell;
 }

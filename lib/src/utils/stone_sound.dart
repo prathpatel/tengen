@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:tengen/src/model/go/board.dart';
+import 'package:tengen/src/utils/test_env.dart';
 
 /// The click of a stone, from the OGS "Floor Goban (deep)" sounds: five takes for each color,
 /// one chosen at random as on OGS (`assets/sounds/stones/`).
@@ -16,10 +16,7 @@ class StoneSound {
   static int _next = 0;
 
   /// Off in widget tests, where there is no audio plugin.
-  static bool enabled = !_inTest;
-
-  // `flutter test` sets FLUTTER_TEST in the environment of the test process.
-  static bool get _inTest => !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
+  static bool enabled = !inFlutterTest;
 
   /// Told of every click, for tests.
   @visibleForTesting
