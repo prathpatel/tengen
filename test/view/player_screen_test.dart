@@ -20,7 +20,7 @@ Map<String, Object?> finished(int id) => {
 };
 
 void main() {
-  testWidgets('the profile downloads the boards of the games in view only', (tester) async {
+  testWidgets('the profile lists its games without downloading each one', (tester) async {
     final requested = <String>{};
     final (:container, sockets: _) = await makeContainer(
       http: (r) {
@@ -51,9 +51,9 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('vs opponent1'), findsOneWidget);
-    // A phone shows a handful of games: the others are neither built nor downloaded.
-    expect(requested.length, lessThan(10));
-    expect(requested, isNotEmpty);
+    expect(find.text('vs opponent2'), findsOneWidget);
+    // Nothing is downloaded per game: a phone must scroll a long list smoothly.
+    expect(requested, isEmpty);
     expect(tester.takeException(), isNull);
   });
 }

@@ -584,7 +584,13 @@ class AccountAvatar extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(color: scheme.primary, shape: BoxShape.circle),
             child: icon != null
-                ? Image.network(icon, fit: BoxFit.cover, errorBuilder: (_, _, _) => initial)
+                ? Image.network(
+                    icon,
+                    fit: BoxFit.cover,
+                    // Decoded at the size shown: some avatars are large images.
+                    cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+                    errorBuilder: (_, _, _) => initial,
+                  )
                 : initial,
           ),
         ),

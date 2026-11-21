@@ -344,6 +344,8 @@ class _BotRow extends StatelessWidget {
                     : Image.network(
                         bot.iconUrl!,
                         fit: BoxFit.cover,
+                        // Decoded small: the bot list shows many of these.
+                        cacheWidth: (64 * MediaQuery.devicePixelRatioOf(context)).round(),
                         errorBuilder: (_, _, _) =>
                             Icon(Icons.smart_toy_outlined, color: scheme.primary),
                       ),

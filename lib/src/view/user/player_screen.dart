@@ -13,7 +13,6 @@ import 'package:tengen/src/model/online_game/bot_challenge_controller.dart';
 import 'package:tengen/src/utils/navigation.dart';
 import 'package:tengen/src/view/online_game/online_game_screen.dart';
 import 'package:tengen/src/view/play/play_screen.dart';
-import 'package:tengen/src/widgets/board_thumbnail.dart';
 import 'package:tengen/src/widgets/game_result_tag.dart';
 import 'package:tengen/src/widgets/segmented_choice.dart';
 import 'package:tengen/src/widgets/ui.dart';
@@ -196,7 +195,13 @@ class _Header extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: icon == null
                 ? initial
-                : Image.network(icon, fit: BoxFit.cover, errorBuilder: (_, _, _) => initial),
+                : Image.network(
+                    icon,
+                    fit: BoxFit.cover,
+                    // Decoded at the size shown: some avatars are large images.
+                    cacheWidth: (112 * MediaQuery.devicePixelRatioOf(context)).round(),
+                    errorBuilder: (_, _, _) => initial,
+                  ),
           ),
           const SizedBox(height: 14),
           Text(player.username, textAlign: TextAlign.center, style: theme.textTheme.headlineMedium),
@@ -293,37 +298,45 @@ class _Stat extends StatelessWidget {
   }
 }
 
-class _RecentGame extends ConsumerWidget {
+/// A finished game of the player: won or lost, against whom, how and when. Nothing is
+/// downloaded per game: a profile lists many, and a phone must scroll them smoothly.
+class _RecentGame extends StatelessWidget {
   const _RecentGame({required this.game, required this.playerId});
 
   final PlayerGame game;
   final int playerId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final data = ref.watch(gameDataProvider(game.id)).value;
-    final board = data?.buildGameCached();
+    final scheme = theme.colorScheme;
     final opponent = game.black.id == playerId ? game.white : game.black;
-    final speed = data?.timeControl?.speed;
+    final mine = game.black.id == playerId ? StoneColor.black : StoneColor.white;
+    final (Color bg, Color fg, String letter) = switch (game.winner) {
+      null => (scheme.surfaceContainerHigh, scheme.onSurfaceVariant, '–'),
+      final w when w == mine => (scheme.secondaryContainer, scheme.secondary, 'W'),
+      _ => (scheme.errorContainer, scheme.error, 'L'),
+    };
     return InkWell(
       onTap: () => pushFullScreen<void>(context, OnlineGameScreen(gameId: game.id)),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
           children: [
-            BoardThumbnail(
-              board: board?.board ?? Board.empty(game.width, game.height),
-              size: 60,
-              lastMove: board?.position.lastMove?.point,
+            Container(
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+              child: Text(letter, style: theme.textTheme.titleSmall?.copyWith(color: fg)),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'vs ${opponent.username}',
+                    'vs ${opponent.username} ${opponent.rankLabel}'.trim(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleMedium,
@@ -331,14 +344,13 @@ class _RecentGame extends ConsumerWidget {
                   Text(
                     [
                       '${game.width}×${game.height}',
-                      if (speed != null && speed.isNotEmpty)
-                        speed[0].toUpperCase() + speed.substring(1),
+                      if (game.outcome case final o? when o.isNotEmpty) o,
                       if (game.ended != null)
                         MaterialLocalizations.of(context).formatShortDate(game.ended!.toLocal()),
                     ].join(' · '),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -352,7 +364,6 @@ class _RecentGame extends ConsumerWidget {
   }
 }
 
-/// The settings of a challenge to [player], sent like the challenge of the OGS player page.
 class _ChallengeSheet extends ConsumerStatefulWidget {
   const _ChallengeSheet({required this.player});
 
