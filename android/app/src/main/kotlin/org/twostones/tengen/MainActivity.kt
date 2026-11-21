@@ -1,4 +1,4 @@
-package dev.tengen.tengen
+package org.twostones.tengen
 
 import io.flutter.embedding.android.FlutterActivity
 
