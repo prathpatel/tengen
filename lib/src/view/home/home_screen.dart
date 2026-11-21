@@ -6,12 +6,10 @@ import 'package:tengen/src/constants.dart';
 import 'package:tengen/src/model/auth/auth_controller.dart';
 import 'package:tengen/src/model/go/board.dart';
 import 'package:tengen/src/model/go/game.dart';
-import 'package:tengen/src/model/learn/learning_hub.dart';
 import 'package:tengen/src/model/ogs/game_data.dart';
 import 'package:tengen/src/model/ogs/ogs_repository.dart';
 import 'package:tengen/src/model/ogs/user.dart';
 import 'package:tengen/src/model/online_game/automatch_controller.dart';
-import 'package:tengen/src/model/puzzle/puzzle.dart';
 import 'package:tengen/src/model/settings/preferences.dart';
 import 'package:tengen/src/utils/navigation.dart';
 import 'package:tengen/src/view/auth/sign_in_screen.dart';
@@ -20,10 +18,9 @@ import 'package:tengen/src/view/home/my_games_screen.dart';
 import 'package:tengen/src/view/online_game/online_game_screen.dart';
 import 'package:tengen/src/view/play/automatch_screen.dart';
 import 'package:tengen/src/view/play/play_screen.dart';
-import 'package:tengen/src/view/puzzle/puzzle_screen.dart';
 import 'package:tengen/src/view/settings/settings_screen.dart';
-import 'package:tengen/src/view/shell_tab.dart';
 import 'package:tengen/src/view/user/player_screen.dart';
+import 'package:tengen/src/widgets/board_thumbnail.dart';
 import 'package:tengen/src/widgets/goban.dart';
 import 'package:tengen/src/widgets/ui.dart';
 
@@ -166,10 +163,7 @@ class HomeScreen extends ConsumerWidget {
                       child: Wrap(spacing: 10, runSpacing: 10, children: [primary, secondary]),
                     ),
                     const SizedBox(height: 26),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: _Tiles(signedIn: signedIn),
-                    ),
+                    _YourGo(heroGameId: current?.id),
                   ],
                 ),
               ),
@@ -432,67 +426,216 @@ class _PillButton extends StatelessWidget {
   }
 }
 
-/// Puzzles, Learn and Watch, each with where you are.
-class _Tiles extends ConsumerWidget {
-  const _Tiles({required this.signedIn});
+/// What is yours below the main buttons: your record and recent form, your other games, and
+/// your last results. Signed out, what signing in brings.
+class _YourGo extends ConsumerWidget {
+  const _YourGo({required this.heroGameId});
 
-  final bool signedIn;
+  /// The game already shown at the top, left out of the other games.
+  final int? heroGameId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final lastPuzzle = ref.watch(lastPuzzleProvider);
-    final hub = ref.watch(learningHubProvider).value;
-    final done = ref.watch(hubProgressProvider);
-    final live = ref.watch(liveGamesProvider(GameListKind.live)).value;
-
-    final topics = hub?.topics.toList() ?? const <HubTopic>[];
-    final topicsDone = topics.where((t) => pagesDone(done, t) == t.pages.length).length;
-    void open(ShellTab tab) => ref.read(shellTabProvider.notifier).select(tab);
-    final tiles = [
-      _Tile(
-        label: 'Puzzles',
-        value: lastPuzzle == null ? 'Start' : 'Resume',
-        onTap: lastPuzzle == null
-            ? () => open(ShellTab.puzzles)
-            : () => pushFullScreen<void>(context, PuzzleScreen(puzzleId: lastPuzzle.id)),
-      ),
-      _Tile(
-        label: 'Learn',
-        value: hub == null ? '…' : '$topicsDone/${topics.length}',
-        onTap: () => open(ShellTab.learn),
-      ),
-      _Tile(
-        label: 'Watch',
-        value: live == null ? '…' : '${live.length} live',
-        onTap: () => open(ShellTab.watch),
-      ),
+    final auth = ref.watch(authProvider).value;
+    if (auth == null || !auth.isSignedIn) return const _SignedOutCard();
+    final user = auth.user;
+    final me = ref.watch(playerProvider(user.id)).value;
+    final stats = ref.watch(playerStatsProvider(user.id)).value;
+    final recent = ref.watch(playerGamesProvider(user.id));
+    final active = ref.watch(activeGamesProvider).value ?? const <PlayerGame>[];
+    final others = [
+      ...active.where((g) => g.id != heroGameId && g.isTurnOf(user.id)),
+      ...active.where((g) => g.id != heroGameId && !g.isTurnOf(user.id)),
     ];
-    return Row(
+    final finished = recent.value ?? const <PlayerGame>[];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final (i, tile) in tiles.indexed) ...[
-          if (i > 0) const SizedBox(width: 10),
-          Expanded(child: tile),
+        _RecordCard(
+          rank: (me ?? user).rankLabel,
+          rating: me?.rating,
+          stats: stats,
+          form: [for (final g in finished.take(10)) _outcomeFor(g, user.id)],
+        ),
+        if (others.isNotEmpty) ...[
+          _SectionHeader(
+            title: 'Your games',
+            trailing: '${others.length}',
+            onTap: () => pushFullScreen<void>(context, const MyGamesScreen()),
+          ),
+          SizedBox(
+            height: 196,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              itemCount: others.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (context, i) => _OngoingCard(game: others[i], userId: user.id),
+            ),
+          ),
         ],
+        _SectionHeader(
+          title: 'Recent games',
+          trailing: 'See all',
+          onTap: () => pushFullScreen<void>(context, const MyGamesScreen()),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: switch (recent) {
+            AsyncData(:final value) when value.isEmpty => const _Note(
+              'No finished games yet. Your results will show here.',
+            ),
+            AsyncData(:final value) => _Rounded(
+              children: [for (final g in value.take(5)) _RecentGameRow(game: g, userId: user.id)],
+            ),
+            AsyncError() => const _Note('Could not load your games.'),
+            _ => const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          },
+        ),
       ],
     );
   }
 }
 
-class _Tile extends StatelessWidget {
-  const _Tile({required this.label, required this.value, this.onTap});
+enum _Outcome { win, loss, other }
 
-  final String label;
-  final String value;
-  final VoidCallback? onTap;
+_Outcome _outcomeFor(PlayerGame g, int userId) {
+  final winner = g.winner;
+  if (winner == null) return _Outcome.other;
+  final mine = g.black.id == userId ? StoneColor.black : StoneColor.white;
+  return winner == mine ? _Outcome.win : _Outcome.loss;
+}
+
+/// `just now`, `40m ago`, `5h ago`, `3d ago`, or the date.
+String _ago(BuildContext context, DateTime time) {
+  final d = DateTime.now().difference(time);
+  if (d.inMinutes < 1) return 'just now';
+  if (d.inHours < 1) return '${d.inMinutes}m ago';
+  if (d.inDays < 1) return '${d.inHours}h ago';
+  if (d.inDays < 7) return '${d.inDays}d ago';
+  return MaterialLocalizations.of(context).formatShortMonthDay(time.toLocal());
+}
+
+/// Rank, rating and record, then the last results as dots (oldest first).
+class _RecordCard extends StatelessWidget {
+  const _RecordCard({
+    required this.rank,
+    required this.rating,
+    required this.stats,
+    required this.form,
+  });
+
+  final String rank;
+  final double? rating;
+  final ({int games, int wins})? stats;
+
+  /// Newest first.
+  final List<_Outcome> form;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final s = stats;
+    final losses = s == null ? null : math.max(0, s.games - s.wins);
+    final rate = s == null || s.games == 0 ? null : (s.wins * 100 / s.games).round().clamp(0, 100);
+    Widget stat(String label, String value) => Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant)),
+          const SizedBox(height: 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: theme.textTheme.headlineMedium?.copyWith(fontSize: 26, height: 1.1),
+            ),
+          ),
+        ],
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: _Rounded(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+        children: [
+          Row(
+            children: [
+              stat('Rank', rank.isEmpty ? '–' : rank),
+              stat('Rating', rating == null ? '–' : '${rating!.round()}'),
+              stat('Record', s == null ? '…' : '${s.wins}–$losses'),
+            ],
+          ),
+          if (form.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Text(
+                  'Last ${form.length}',
+                  style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final o in form.reversed)
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: switch (o) {
+                              _Outcome.win => scheme.secondary,
+                              _Outcome.loss => scheme.error,
+                              _Outcome.other => scheme.outline,
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (rate != null)
+                  Text(
+                    '$rate% won',
+                    style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Another game of yours: its board, the opponent and whose move it is.
+class _OngoingCard extends StatelessWidget {
+  const _OngoingCard({required this.game, required this.userId});
+
+  final PlayerGame game;
+  final int userId;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final opponent = game.black.id == userId ? game.white : game.black;
+    final built = game.data?.buildGame();
+    final myTurn = game.isTurnOf(userId);
     return Pressable(
-      onTap: onTap,
+      onTap: () => pushFullScreen<void>(context, OnlineGameScreen(gameId: game.id)),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 14, 12, 16),
+        width: 148,
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: scheme.surfaceContainerHigh.withValues(alpha: 0.8),
           borderRadius: BorderRadius.circular(24),
@@ -500,18 +643,32 @@ class _Tile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: built == null
+                  ? SizedBox.square(
+                      dimension: 128,
+                      child: ColoredBox(color: scheme.surfaceContainerHighest),
+                    )
+                  : BoardThumbnail(
+                      board: built.board,
+                      size: 128,
+                      lastMove: built.position.lastMove?.point,
+                    ),
             ),
             const SizedBox(height: 8),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                value,
-                maxLines: 1,
-                style: theme.textTheme.headlineMedium?.copyWith(fontSize: 26, height: 1.1),
+            Text(
+              opponent.username,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall,
+            ),
+            Text(
+              myTurn ? 'Your move' : 'Their move',
+              maxLines: 1,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: myTurn ? scheme.primary : scheme.onSurfaceVariant,
+                fontWeight: myTurn ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
           ],
@@ -519,6 +676,173 @@ class _Tile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A finished game: won or lost, against whom, how and when.
+class _RecentGameRow extends StatelessWidget {
+  const _RecentGameRow({required this.game, required this.userId});
+
+  final PlayerGame game;
+  final int userId;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final opponent = game.black.id == userId ? game.white : game.black;
+    final outcome = _outcomeFor(game, userId);
+    final (Color bg, Color fg, String letter) = switch (outcome) {
+      _Outcome.win => (scheme.secondaryContainer, scheme.onSecondaryContainer, 'W'),
+      _Outcome.loss => (scheme.errorContainer, scheme.onErrorContainer, 'L'),
+      _Outcome.other => (scheme.surfaceContainerHighest, scheme.onSurfaceVariant, '–'),
+    };
+    return InkWell(
+      onTap: () => pushFullScreen<void>(context, OnlineGameScreen(gameId: game.id)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+              child: Text(letter, style: theme.textTheme.titleMedium?.copyWith(color: fg)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'vs ${opponent.username} ${opponent.rankLabel}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(fontSize: 16),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      '${game.width}×${game.height}',
+                      if (game.outcome != null && game.outcome!.isNotEmpty) game.outcome!,
+                      if (game.ended != null) _ago(context, game.ended!),
+                    ].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Signed out: what signing in adds to this screen.
+class _SignedOutCard extends StatelessWidget {
+  const _SignedOutCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: _Rounded(
+        padding: const EdgeInsets.all(18),
+        children: [
+          Row(
+            children: [
+              Icon(Icons.history_rounded, color: scheme.primary),
+              const SizedBox(width: 12),
+              Expanded(child: Text('Your games, here', style: theme.textTheme.titleMedium)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Sign in to online-go.com to see your rank and record, the games waiting for you '
+            'and your game history on this screen.',
+            style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// `Recent games                See all`
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, this.trailing, this.onTap});
+
+  final String title;
+  final String? trailing;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 14, 10),
+      child: Row(
+        children: [
+          Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
+          if (trailing != null)
+            TextButton(
+              onPressed: onTap,
+              style: TextButton.styleFrom(
+                foregroundColor: scheme.onSurfaceVariant,
+                minimumSize: const Size(0, 36),
+              ),
+              child: Text(trailing!),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A soft rounded block on the high surface.
+class _Rounded extends StatelessWidget {
+  const _Rounded({required this.children, this.padding = const EdgeInsets.symmetric(vertical: 4)});
+
+  final List<Widget> children;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: padding,
+    clipBehavior: Clip.antiAlias,
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surfaceContainerHigh.withValues(alpha: 0.8),
+      borderRadius: BorderRadius.circular(26),
+    ),
+    child: Material(
+      type: MaterialType.transparency,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+    ),
+  );
+}
+
+class _Note extends StatelessWidget {
+  const _Note(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => _Rounded(
+    padding: const EdgeInsets.all(18),
+    children: [
+      Text(
+        text,
+        style: Theme.of(context).textTheme.bodyMedium
+            ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+      ),
+    ],
+  );
 }
 
 /// Your avatar (or a person icon when signed out) in the accent color, for the account sheet.

@@ -128,13 +128,12 @@ void main() {
           await openTab('Learn', 'Learn to play Go');
           await openTab('Watch', 'Updated live');
           await openTab('Home', 'Play now');
-          // The home tiles open their tabs too.
-          await tester.ensureVisible(find.text('Watch'));
+          // Below the buttons: your record and your game history.
+          await tester.ensureVisible(find.text('Recent games'));
           await tester.pumpAndSettle();
-          await tester.tap(find.text('Watch'), warnIfMissed: false);
-          await tester.pumpAndSettle();
-          expect(find.text('Updated live'), findsWidgets);
-          await openTab('Home', 'Play now');
+          expect(find.text('Record'), findsOneWidget);
+          expect(find.textContaining('vs a-very-long-opponent-username-indeed'), findsOneWidget);
+          expect(tester.takeException(), isNull, reason: 'history');
           // The other tabs fade out of sight.
           expect(find.text('Updated live'), findsNothing);
 
