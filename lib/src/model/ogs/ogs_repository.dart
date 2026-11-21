@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tengen/src/model/auth/auth_controller.dart';
 import 'package:tengen/src/model/ogs/game_data.dart';
@@ -166,6 +168,10 @@ final headToHeadProvider = FutureProvider.autoDispose
     });
 
 /// The moves of a game, for a small board (finished games come without them).
-final gameDataProvider = FutureProvider.autoDispose.family<OgsGameData?, int>(
-  (ref, id) => ref.watch(ogsRepositoryProvider).gameData(id),
-);
+final gameDataProvider = FutureProvider.autoDispose.family<OgsGameData?, int>((ref, id) {
+  // Kept a few minutes once out of view: scrolling back must not download it again.
+  final link = ref.keepAlive();
+  final timer = Timer(const Duration(minutes: 5), link.close);
+  ref.onDispose(timer.cancel);
+  return ref.watch(ogsRepositoryProvider).gameData(id);
+});

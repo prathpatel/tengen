@@ -139,6 +139,11 @@ class OgsGameData {
   /// Builds the game by replaying the server moves.
   ///
   /// Moves are not validated: the server is authoritative.
+  static final _built = Expando<GoGame>();
+
+  /// [buildGame], replayed once per game data: lists show many games and rebuild often.
+  GoGame buildGameCached() => _built[this] ??= buildGame();
+
   GoGame buildGame() {
     final hasSetup = initialBlack.isNotEmpty || initialWhite.isNotEmpty;
     final placesFixedHandicap =

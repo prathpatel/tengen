@@ -29,7 +29,7 @@ class MyGamesScreen extends ConsumerWidget {
 
     Widget ongoing(PlayerGame g) {
       final opponent = colorIn(g) == StoneColor.black ? g.white : g.black;
-      final game = g.data?.buildGame();
+      final game = g.data?.buildGameCached();
       final myTurn = g.isTurnOf(user.id);
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),

@@ -110,15 +110,17 @@ class PlayerScreen extends ConsumerWidget {
           const SectionLabel('Recent games', padding: EdgeInsets.fromLTRB(24, 26, 24, 6)),
           switch (games) {
             AsyncData(:final value) when value.isEmpty => const ListTile(title: Text('No games')),
-            AsyncData(:final value) => Column(
-              children: [for (final g in value) _RecentGame(game: g, playerId: playerId)],
-            ),
+            AsyncData() => const SizedBox.shrink(),
             AsyncError(:final error) => ListTile(title: Text('Could not load the games: $error')),
             _ => const Padding(
               padding: EdgeInsets.all(16),
               child: Center(child: CircularProgressIndicator()),
             ),
           },
+          // One child of the list per game: only the games in view are built, and only theirs
+          // are downloaded.
+          if (games case AsyncData(:final value))
+            for (final g in value.take(15)) _RecentGame(game: g, playerId: playerId),
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
             child: Text(
@@ -301,7 +303,7 @@ class _RecentGame extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final data = ref.watch(gameDataProvider(game.id)).value;
-    final board = data?.buildGame();
+    final board = data?.buildGameCached();
     final opponent = game.black.id == playerId ? game.white : game.black;
     final speed = data?.timeControl?.speed;
     return InkWell(

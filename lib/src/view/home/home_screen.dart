@@ -73,7 +73,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final current = games == null || games.isEmpty
         ? null
         : (games.where((g) => g.isTurnOf(user!.id)).firstOrNull ?? games.first);
-    final currentGame = current?.data?.buildGame();
+    final currentGame = current?.data?.buildGameCached();
 
     void play() {
       if (!signedIn) {
@@ -371,15 +371,18 @@ class _BackdropState extends State<_Backdrop> with SingleTickerProviderStateMixi
                     angle: -0.14,
                     child: SizedBox.square(
                       dimension: size,
-                      child: IgnorePointer(
-                        child: ExcludeSemantics(
-                          child: Goban(
-                            board: widget.board,
-                            lastMove: widget.lastMove,
-                            theme: widget.prefs.boardTheme,
-                            blackStones: widget.prefs.blackStones,
-                            whiteStones: widget.prefs.whiteStones,
-                            showCoordinates: false,
+                      // Drawn once, then only moved by the drift.
+                      child: RepaintBoundary(
+                        child: IgnorePointer(
+                          child: ExcludeSemantics(
+                            child: Goban(
+                              board: widget.board,
+                              lastMove: widget.lastMove,
+                              theme: widget.prefs.boardTheme,
+                              blackStones: widget.prefs.blackStones,
+                              whiteStones: widget.prefs.whiteStones,
+                              showCoordinates: false,
+                            ),
                           ),
                         ),
                       ),
@@ -806,7 +809,7 @@ class _OngoingCard extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final opponent = game.black.id == userId ? game.white : game.black;
-    final built = game.data?.buildGame();
+    final built = game.data?.buildGameCached();
     final myTurn = game.isTurnOf(userId);
     return Pressable(
       onTap: () => pushFullScreen<void>(context, OnlineGameScreen(gameId: game.id)),
