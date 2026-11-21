@@ -17,7 +17,11 @@ import 'package:tengen/src/widgets/ui.dart';
 /// The top games being played on OGS, with their boards, and the chat rooms, in a sheet over
 /// the home screen.
 class WatchSheet extends ConsumerStatefulWidget {
-  const WatchSheet({super.key});
+  const WatchSheet({this.page = false, super.key});
+
+  /// Shown as a tab of the app rather than in a sheet: clear of the status bar and of the
+  /// floating tab bar.
+  final bool page;
 
   @override
   ConsumerState<WatchSheet> createState() => _WatchSheetState();
@@ -41,7 +45,7 @@ class _WatchSheetState extends ConsumerState<WatchSheet> {
         await ref.read(liveGamesProvider(_kind).future).catchError((_) => <GameListEntry>[]);
       },
       child: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
+        padding: tabPagePadding(context, page: widget.page),
         children: [
           SheetTitle(
             'Watch',

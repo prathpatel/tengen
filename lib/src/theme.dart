@@ -1,9 +1,9 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/model/settings/preferences.dart';
 
-/// The colors the app takes from the board, as the lichess app does: a tint for the surfaces and
-/// an accent. Kaya and the light woods keep near neutral surfaces with a gold accent; Black
-/// Walnut gives warm browns with a terracotta accent; Granite slate greys with a teal accent.
+/// The colors the app takes from the board, as the lichess app does: a warm or cool tint for the
+/// surfaces and a soft pastel accent. The woods give mocha browns (Black Walnut an apricot
+/// accent, Kaya a pale gold), Granite slate greens with a sea-glass accent.
 @immutable
 class BoardPalette {
   const BoardPalette(this.hue, this.saturation, this.accent);
@@ -16,18 +16,18 @@ class BoardPalette {
   final Color accent;
 
   factory BoardPalette.of(BoardTheme board) => switch (board) {
-    BoardTheme.kaya || BoardTheme.plain => const BoardPalette(40, 0.04, Color(0xFFE8B96F)),
-    BoardTheme.brightKaya => const BoardPalette(40, 0.05, Color(0xFFEBC27A)),
-    BoardTheme.persimmon => const BoardPalette(45, 0.06, Color(0xFFE6C47A)),
-    BoardTheme.badukTV => const BoardPalette(42, 0.06, Color(0xFFE9BE5B)),
-    BoardTheme.redOak => const BoardPalette(24, 0.24, Color(0xFFE9A066)),
-    BoardTheme.blackWalnut => const BoardPalette(20, 0.33, Color(0xFFE3A27F)),
-    BoardTheme.communityFavorite => const BoardPalette(30, 0.18, Color(0xFFE2AE73)),
-    BoardTheme.granite => const BoardPalette(205, 0.15, Color(0xFF8FC9C9)),
-    BoardTheme.nightPlay => const BoardPalette(220, 0.07, Color(0xFFAAB6C6)),
-    BoardTheme.hng => const BoardPalette(188, 0.32, Color(0xFF4FD8E6)),
-    BoardTheme.hngNight => const BoardPalette(230, 0.34, Color(0xFF6CA8EA)),
-    BoardTheme.book => const BoardPalette(40, 0.02, Color(0xFFD9D4CA)),
+    BoardTheme.kaya || BoardTheme.plain => const BoardPalette(34, 0.16, Color(0xFFF0CF95)),
+    BoardTheme.brightKaya => const BoardPalette(36, 0.16, Color(0xFFF2D69C)),
+    BoardTheme.persimmon => const BoardPalette(38, 0.16, Color(0xFFF2D59A)),
+    BoardTheme.badukTV => const BoardPalette(38, 0.16, Color(0xFFF0CF86)),
+    BoardTheme.redOak => const BoardPalette(22, 0.28, Color(0xFFF2BE95)),
+    BoardTheme.blackWalnut => const BoardPalette(22, 0.26, Color(0xFFF0C7A0)),
+    BoardTheme.communityFavorite => const BoardPalette(28, 0.22, Color(0xFFF0C89A)),
+    BoardTheme.granite => const BoardPalette(180, 0.22, Color(0xFFA9D6D3)),
+    BoardTheme.nightPlay => const BoardPalette(220, 0.12, Color(0xFFBCC7D6)),
+    BoardTheme.hng => const BoardPalette(188, 0.3, Color(0xFF8FE3EC)),
+    BoardTheme.hngNight => const BoardPalette(230, 0.3, Color(0xFFA9C4F2)),
+    BoardTheme.book => const BoardPalette(40, 0.05, Color(0xFFE3DED3)),
   };
 
   Color _tint(double lightness, [double satFactor = 1]) =>
@@ -45,7 +45,7 @@ class BoardPalette {
     final onPrimary = dark
         ? accentHsl.withLightness(0.1).withSaturation(accentHsl.saturation * 0.6).toColor()
         : Colors.white;
-    final card = dark ? _tint(0.135) : Colors.white;
+    final card = dark ? _tint(0.155) : Colors.white;
     return ColorScheme(
       brightness: brightness,
       primary: primary,
@@ -68,14 +68,14 @@ class BoardPalette {
       onError: dark ? const Color(0xFF3A0805) : Colors.white,
       errorContainer: dark ? const Color(0xFF341817) : const Color(0xFFFCDCD8),
       onErrorContainer: dark ? const Color(0xFFFFC9C3) : const Color(0xFF410A06),
-      surface: dark ? _tint(0.055) : _tint(0.95, 0.6),
+      surface: dark ? _tint(0.075) : _tint(0.95, 0.6),
       onSurface: dark ? _tint(0.93, 0.25) : _tint(0.1, 0.4),
-      onSurfaceVariant: dark ? _tint(0.6, 0.35) : _tint(0.4, 0.4),
-      surfaceContainerLowest: dark ? _tint(0.035) : Colors.white,
-      surfaceContainerLow: dark ? _tint(0.095) : _tint(0.985, 0.5),
+      onSurfaceVariant: dark ? _tint(0.66, 0.3) : _tint(0.4, 0.4),
+      surfaceContainerLowest: dark ? _tint(0.05) : Colors.white,
+      surfaceContainerLow: dark ? _tint(0.115) : _tint(0.985, 0.5),
       surfaceContainer: card,
-      surfaceContainerHigh: dark ? _tint(0.175) : _tint(0.91, 0.5),
-      surfaceContainerHighest: dark ? _tint(0.235) : _tint(0.86, 0.5),
+      surfaceContainerHigh: dark ? _tint(0.2) : _tint(0.91, 0.5),
+      surfaceContainerHighest: dark ? _tint(0.26) : _tint(0.86, 0.5),
       outline: dark ? _tint(0.33, 0.5) : _tint(0.68, 0.4),
       outlineVariant: dark ? _tint(0.2, 0.6) : _tint(0.88, 0.4),
       inverseSurface: dark ? _tint(0.93, 0.25) : _tint(0.15, 0.5),
@@ -100,25 +100,29 @@ ThemeData buildTheme(Brightness brightness, BoardTheme board) {
   final sized = Typography.material2021().englishLike
       .merge(base.textTheme)
       .apply(fontFamily: _font);
+  // Large text is light and tight (Inter Display Light), as in the design: big thin numbers and
+  // headlines, medium weights for names and buttons.
   final text = sized.copyWith(
-    headlineLarge: sized.headlineLarge?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.5),
+    displaySmall: sized.displaySmall?.copyWith(fontWeight: FontWeight.w300, letterSpacing: -1.2),
+    headlineLarge: sized.headlineLarge?.copyWith(fontWeight: FontWeight.w300, letterSpacing: -1),
     headlineMedium: sized.headlineMedium?.copyWith(
-      fontWeight: FontWeight.w700,
-      letterSpacing: -0.4,
+      fontWeight: FontWeight.w300,
+      letterSpacing: -0.8,
     ),
-    headlineSmall: sized.headlineSmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.3),
-    titleLarge: sized.titleLarge?.copyWith(fontWeight: FontWeight.w700, fontSize: 21),
-    titleMedium: sized.titleMedium?.copyWith(fontWeight: FontWeight.w600, fontSize: 17),
-    titleSmall: sized.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-    labelLarge: sized.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+    headlineSmall: sized.headlineSmall?.copyWith(fontWeight: FontWeight.w500, letterSpacing: -0.4),
+    titleLarge: sized.titleLarge?.copyWith(fontWeight: FontWeight.w500, fontSize: 21),
+    titleMedium: sized.titleMedium?.copyWith(fontWeight: FontWeight.w500, fontSize: 17),
+    titleSmall: sized.titleSmall?.copyWith(fontWeight: FontWeight.w500),
+    labelLarge: sized.labelLarge?.copyWith(fontWeight: FontWeight.w500),
   );
   const radius = BorderRadius.all(Radius.circular(18));
-  const buttonShape = RoundedRectangleBorder(borderRadius: radius);
-  const buttonSize = Size(64, 56);
+  // Pills, as in the design.
+  const buttonShape = StadiumBorder();
+  const buttonSize = Size(64, 54);
   const buttonText = TextStyle(
     fontFamily: _font,
-    fontSize: 17,
-    fontWeight: FontWeight.w700,
+    fontSize: 16,
+    fontWeight: FontWeight.w500,
     letterSpacing: 0,
   );
   return base.copyWith(
@@ -126,6 +130,13 @@ ThemeData buildTheme(Brightness brightness, BoardTheme board) {
     scaffoldBackgroundColor: scheme.surface,
     canvasColor: scheme.surface,
     splashFactory: InkSparkle.splashFactory,
+    // Screens fade and slide in softly rather than zoom.
+    pageTransitionsTheme: PageTransitionsTheme(
+      builders: {
+        for (final platform in TargetPlatform.values)
+          platform: const FadeForwardsPageTransitionsBuilder(),
+      },
+    ),
     appBarTheme: AppBarTheme(
       centerTitle: true,
       backgroundColor: scheme.surface,

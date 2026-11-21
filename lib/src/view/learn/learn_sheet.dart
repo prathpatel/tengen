@@ -14,7 +14,11 @@ import 'package:tengen/src/widgets/ui.dart';
 
 /// The OGS Learning Hub course and practice, in a sheet over the home screen.
 class LearnSheet extends ConsumerWidget {
-  const LearnSheet({super.key});
+  const LearnSheet({this.page = false, super.key});
+
+  /// Shown as a tab of the app rather than in a sheet: clear of the status bar and of the
+  /// floating tab bar.
+  final bool page;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -25,7 +29,7 @@ class LearnSheet extends ConsumerWidget {
     final scheme = theme.colorScheme;
 
     return ListView(
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: tabPagePadding(context, page: page),
       children: [
         const SheetTitle('Learn to play Go'),
         switch (hub) {

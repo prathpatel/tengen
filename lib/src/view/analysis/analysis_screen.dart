@@ -172,6 +172,8 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
 
     final winner = score?.winner;
     return Scaffold(
+      // The warmer, lighter tone of the game screens.
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       appBar: TopBar(
         title: widget.title,
         subtitle: score != null

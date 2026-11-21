@@ -96,3 +96,5 @@ Inter font
 
 `assets/fonts/inter/` is the [Inter](https://github.com/rsms/inter) typeface, © The Inter Project
 Authors, under the SIL Open Font License 1.1 (`assets/fonts/inter/OFL.txt`).
+`Inter-Light.ttf` is the Display optical size at weight 300, cut from the variable font of the
+Google Fonts release with fontTools' instancer.

@@ -2,7 +2,7 @@ name: tengen
 description: Tengen, an open source mobile app to play Go on online-go.com and offline.
 publish_to: "none"
 
-version: 0.7.1+19
+version: 0.8.0+20
 
 environment:
   sdk: ^3.14.0
@@ -40,6 +40,8 @@ flutter:
   fonts:
     - family: Inter
       fonts:
+        - asset: assets/fonts/inter/Inter-Light.ttf
+          weight: 300
         - asset: assets/fonts/inter/Inter-Regular.ttf
         - asset: assets/fonts/inter/Inter-Medium.ttf
           weight: 500

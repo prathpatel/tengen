@@ -208,6 +208,8 @@ class _HubTopicScreenState extends ConsumerState<HubTopicScreen> {
 
     final pages = topic.pages.length;
     return Scaffold(
+      // The warmer, lighter tone of the game screens.
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

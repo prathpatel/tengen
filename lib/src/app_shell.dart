@@ -1,17 +1,58 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:tengen/src/model/auth/auth_controller.dart';
 import 'package:tengen/src/model/online_game/automatch_controller.dart';
 import 'package:tengen/src/view/home/home_screen.dart';
+import 'package:tengen/src/view/learn/learn_sheet.dart';
 import 'package:tengen/src/view/online_game/online_game_screen.dart';
 import 'package:tengen/src/view/play/automatch_screen.dart';
+import 'package:tengen/src/view/puzzle/puzzles_sheet.dart';
+import 'package:tengen/src/view/watch/watch_sheet.dart';
+import 'package:tengen/src/widgets/ui.dart';
 
-/// The home screen, and what must work wherever the user is: the game found by the automatch
+/// The tabs of the app, in a floating glass bar: Home, Puzzles, Learn, Watch, and your avatar
+/// for the account. Also what must work wherever the user is: the game found by the automatch
 /// opens, whichever screen started the search, and a bar shows a search that goes on.
-class AppShell extends ConsumerWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AppShell> createState() => _AppShellState();
+}
+
+enum _Tab {
+  home('Home', Icons.home_outlined, Icons.home_rounded),
+  puzzles('Puzzles', Icons.extension_outlined, Icons.extension_rounded),
+  learn('Learn', Icons.school_outlined, Icons.school_rounded),
+  watch('Watch', Icons.live_tv_outlined, Icons.live_tv_rounded);
+
+  const _Tab(this.label, this.icon, this.selectedIcon);
+
+  final String label;
+  final IconData icon;
+  final IconData selectedIcon;
+}
+
+class _AppShellState extends ConsumerState<AppShell> {
+  _Tab _tab = _Tab.home;
+
+  /// The tabs opened so far; they keep their state (scroll, choices) once built.
+  final _opened = <_Tab>{_Tab.home};
+
+  void _select(_Tab tab) => setState(() {
+    _tab = tab;
+    _opened.add(tab);
+  });
+
+  Widget _page(_Tab tab) => switch (tab) {
+    _Tab.home => const HomeScreen(),
+    _Tab.puzzles => const PuzzlesSheet(page: true),
+    _Tab.learn => const LearnSheet(page: true),
+    _Tab.watch => const WatchSheet(page: true),
+  };
+
+  @override
+  Widget build(BuildContext context) {
     final automatch = ref.watch(automatchProvider);
 
     ref.listen(automatchProvider, (_, next) {
@@ -24,16 +65,158 @@ class AppShell extends ConsumerWidget {
       }
     });
 
-    return Scaffold(
-      body: const HomeScreen(),
-      bottomNavigationBar: automatch is AutomatchSearching
-          ? _SearchingBar(automatch.settings)
-          : null,
+    return PopScope(
+      // Back from another tab goes home first.
+      canPop: _tab == _Tab.home,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _select(_Tab.home);
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            for (final tab in _Tab.values)
+              if (_opened.contains(tab))
+                _FadingPage(key: ValueKey(tab), active: tab == _tab, child: _page(tab)),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 250),
+                        transitionBuilder: (child, animation) => FadeTransition(
+                          opacity: animation,
+                          child: SizeTransition(sizeFactor: animation, child: child),
+                        ),
+                        child: automatch is AutomatchSearching
+                            ? _SearchingBar(automatch.settings)
+                            : const SizedBox(width: double.infinity),
+                      ),
+                      _TabBar(selected: _tab, onSelect: _select),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-/// Shown at the bottom of the home screen while the automatch looks for an opponent.
+/// A tab: it fades in when selected, and out of sight (and of finders and screen readers) when
+/// another is.
+class _FadingPage extends StatefulWidget {
+  const _FadingPage({required this.active, required this.child, super.key});
+
+  final bool active;
+  final Widget child;
+
+  @override
+  State<_FadingPage> createState() => _FadingPageState();
+}
+
+class _FadingPageState extends State<_FadingPage> {
+  late bool _hidden = !widget.active;
+
+  @override
+  void didUpdateWidget(_FadingPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active) _hidden = false;
+  }
+
+  @override
+  Widget build(BuildContext context) => Offstage(
+    offstage: _hidden,
+    child: IgnorePointer(
+      ignoring: !widget.active,
+      child: AnimatedOpacity(
+        opacity: widget.active ? 1 : 0,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        onEnd: () {
+          if (!widget.active && mounted) setState(() => _hidden = true);
+        },
+        child: AnimatedScale(
+          scale: widget.active ? 1 : 0.985,
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+          // The page's own animations pause while it is out of sight.
+          child: TickerMode(enabled: widget.active, child: widget.child),
+        ),
+      ),
+    ),
+  );
+}
+
+/// The floating glass bar: a round button per tab, then your avatar.
+class _TabBar extends ConsumerWidget {
+  const _TabBar({required this.selected, required this.onSelect});
+
+  final _Tab selected;
+  final ValueChanged<_Tab> onSelect;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final auth = ref.watch(authProvider).value;
+    return GlassPanel(
+      radius: 34,
+      padding: const EdgeInsets.all(6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final tab in _Tab.values) ...[
+            Semantics(
+              button: true,
+              selected: tab == selected,
+              label: tab.label,
+              excludeSemantics: true,
+              child: Tooltip(
+                message: tab.label,
+                child: Pressable(
+                  onTap: () => onSelect(tab),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 240),
+                    curve: Curves.easeOutCubic,
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: tab == selected
+                          ? scheme.onSurface.withValues(alpha: 0.14)
+                          : Colors.transparent,
+                    ),
+                    child: Icon(
+                      tab == selected ? tab.selectedIcon : tab.icon,
+                      size: 24,
+                      color: tab == selected ? scheme.onSurface : scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
+          AccountAvatar(
+            user: auth?.isSignedIn ?? false ? auth!.user : null,
+            size: 52,
+            onTap: () => showAccountSheet(context),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown above the tab bar while the automatch looks for an opponent.
 class _SearchingBar extends ConsumerWidget {
   const _SearchingBar(this.settings);
 
@@ -43,43 +226,43 @@ class _SearchingBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Material(
-      color: scheme.primaryContainer,
-      child: InkWell(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Pressable(
+        scale: 0.98,
         onTap: () => Navigator.of(
           context,
           rootNavigator: true,
         ).push(MaterialPageRoute<void>(builder: (_) => const AutomatchScreen())),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 10, 10),
-            child: Row(
-              children: [
-                SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
+        child: GlassPanel(
+          radius: 28,
+          tint: scheme.primaryContainer,
+          opacity: 0.85,
+          padding: const EdgeInsets.fromLTRB(20, 6, 8, 6),
+          child: Row(
+            children: [
+              SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onPrimaryContainer),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  'Looking for an opponent · ${settings.size}×${settings.size} '
+                  '${settings.speed.label.toLowerCase()}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyLarge?.copyWith(
                     color: scheme.onPrimaryContainer,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    'Looking for an opponent · ${settings.size}×${settings.size} '
-                    '${settings.speed.label.toLowerCase()}',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: scheme.onPrimaryContainer,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => ref.read(automatchProvider.notifier).cancel(),
-                  child: const Text('Cancel'),
-                ),
-              ],
-            ),
+              ),
+              TextButton(
+                onPressed: () => ref.read(automatchProvider.notifier).cancel(),
+                child: const Text('Cancel'),
+              ),
+            ],
           ),
         ),
       ),

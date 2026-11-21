@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:material_ui/material_ui.dart';
 
 /// The building blocks of the Tengen design: round icon buttons, labelled round actions, small
@@ -172,6 +174,8 @@ class RoundAction extends StatelessWidget {
   });
 
   final IconData icon;
+
+  /// Said by the tooltip and to screen readers; the button itself shows only the icon.
   final String label;
   final VoidCallback? onPressed;
 
@@ -180,12 +184,11 @@ class RoundAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final scheme = Theme.of(context).colorScheme;
     final enabled = onPressed != null;
     final fg = highlighted
         ? scheme.onPrimary
-        : (enabled ? scheme.onSurface : scheme.onSurfaceVariant.withValues(alpha: 0.5));
+        : (enabled ? scheme.onSurface : scheme.onSurfaceVariant.withValues(alpha: 0.4));
     return Semantics(
       button: true,
       enabled: enabled,
@@ -193,39 +196,18 @@ class RoundAction extends StatelessWidget {
       excludeSemantics: true,
       child: Tooltip(
         message: label,
-        child: InkWell(
+        child: Pressable(
           onTap: onPressed,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: highlighted ? scheme.primary : scheme.surfaceContainer,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: fg, size: 26),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  label,
-                  maxLines: 1,
-                  // Large system fonts must not push the circle out of the bar.
-                  textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.2),
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: highlighted
-                        ? scheme.primary
-                        : (enabled ? scheme.onSurfaceVariant : scheme.outline),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            width: 56,
+            height: 52,
+            decoration: BoxDecoration(
+              color: highlighted ? scheme.primary : Colors.transparent,
+              borderRadius: BorderRadius.circular(26),
             ),
+            child: Icon(icon, color: fg, size: 24),
           ),
         ),
       ),
@@ -233,7 +215,7 @@ class RoundAction extends StatelessWidget {
   }
 }
 
-/// A row of [RoundAction]s, evenly spread.
+/// The actions of a game or a puzzle: icons in a floating glass pill.
 class RoundActionBar extends StatelessWidget {
   const RoundActionBar({required this.actions, super.key});
 
@@ -243,11 +225,123 @@ class RoundActionBar extends StatelessWidget {
   Widget build(BuildContext context) => SafeArea(
     top: false,
     child: Padding(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [for (final a in actions) Flexible(child: a)],
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: GlassPanel(
+        radius: 32,
+        padding: const EdgeInsets.all(6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final (i, a) in actions.indexed) ...[
+              if (i > 0) const SizedBox(width: 6),
+              Flexible(child: a),
+            ],
+          ],
+        ),
       ),
+    ),
+  );
+}
+
+/// The height of the floating tab bar with its margin, kept clear at the bottom of tab pages.
+const kFloatingBarClearance = 96.0;
+
+/// The padding of a list that is either a tab page (below the status bar, above the floating
+/// tab bar) or the content of a sheet.
+EdgeInsets tabPagePadding(BuildContext context, {required bool page}) {
+  if (!page) return const EdgeInsets.only(bottom: 24);
+  final insets = MediaQuery.paddingOf(context);
+  return EdgeInsets.only(top: insets.top + 16, bottom: insets.bottom + kFloatingBarClearance + 8);
+}
+
+/// Frosted glass: what is behind shows through, blurred, under a tint of the surface.
+class GlassPanel extends StatelessWidget {
+  const GlassPanel({
+    required this.child,
+    this.radius = 24,
+    this.padding = EdgeInsets.zero,
+    this.tint,
+    this.opacity = 0.72,
+    super.key,
+  });
+
+  final Widget child;
+  final double radius;
+  final EdgeInsetsGeometry padding;
+
+  /// The tint, the high surface by default.
+  final Color? tint;
+  final double opacity;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = scheme.brightness == Brightness.dark;
+    final shape = BorderRadius.circular(radius);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: shape,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: dark ? 0.35 : 0.12),
+            blurRadius: 28,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: shape,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            padding: padding,
+            decoration: BoxDecoration(
+              color: (tint ?? scheme.surfaceContainerHigh).withValues(alpha: opacity),
+              borderRadius: shape,
+              border: Border.all(
+                color: (dark ? Colors.white : Colors.black).withValues(alpha: dark ? 0.07 : 0.05),
+              ),
+            ),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Shrinks a little while pressed and springs back: the soft touch of the design's buttons and
+/// cards.
+class Pressable extends StatefulWidget {
+  const Pressable({required this.child, this.onTap, this.scale = 0.95, super.key});
+
+  final Widget child;
+  final VoidCallback? onTap;
+  final double scale;
+
+  @override
+  State<Pressable> createState() => _PressableState();
+}
+
+class _PressableState extends State<Pressable> {
+  bool _down = false;
+
+  void _set(bool down) {
+    if (widget.onTap != null && down != _down) setState(() => _down = down);
+  }
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    onTap: widget.onTap,
+    onTapDown: (_) => _set(true),
+    onTapUp: (_) => _set(false),
+    onTapCancel: () => _set(false),
+    child: AnimatedScale(
+      scale: _down ? widget.scale : 1,
+      duration: Duration(milliseconds: _down ? 90 : 260),
+      curve: _down ? Curves.easeOut : Curves.easeOutBack,
+      child: widget.child,
     ),
   );
 }

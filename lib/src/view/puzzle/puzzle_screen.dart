@@ -47,6 +47,8 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
     final puzzle = async.value?.puzzle;
     final description = puzzle?.description;
     return Scaffold(
+      // The warmer, lighter tone of the game screens.
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       appBar: TopBar(
         title: index >= 0
             ? 'Puzzle ${index + 1} of ${summary!.length}'

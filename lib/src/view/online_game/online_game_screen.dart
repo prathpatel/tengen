@@ -166,6 +166,8 @@ class _OnlineGameScreenState extends ConsumerState<OnlineGameScreen> {
 
     final value = async.value;
     return Scaffold(
+      // The warmer, lighter tone of the game screens.
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       appBar: TopBar(
         title: value == null ? 'Game $gameId' : _title(value),
         subtitle: !connected ? 'Reconnecting…' : (value == null ? null : _subtitle(value)),

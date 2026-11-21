@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/model/go/board.dart';
 import 'package:tengen/src/model/ogs/clock.dart';
+import 'package:tengen/src/widgets/ui.dart';
 
 /// A small stone icon.
 class StoneIcon extends StatelessWidget {
@@ -41,8 +42,9 @@ class StoneIcon extends StatelessWidget {
   );
 }
 
-/// A player above or below the board, in a rounded pill: the opponent on the left above the
-/// board, you on the right below it. The player to move is outlined in the accent color.
+/// A player above or below the board: a full-width rounded card with the stone, the name and
+/// rank, a line of detail and the clock in large thin figures. The player to move is on the
+/// accent color, the other on soft glass.
 class PlayerPill extends StatelessWidget {
   const PlayerPill({
     required this.color,
@@ -66,7 +68,7 @@ class PlayerPill extends StatelessWidget {
   /// The line below the name: `3 captures`, `Your move · 2 captures`.
   final String? detail;
 
-  /// A short status in the accent, e.g. `Passed`.
+  /// A short status in bold, e.g. `Passed`.
   final String? note;
 
   /// The clock, for online games.
@@ -77,7 +79,7 @@ class PlayerPill extends StatelessWidget {
   /// Shows that the computer is choosing its move.
   final bool thinking;
 
-  /// Aligned to the right, with the stone last (you, below the board).
+  /// You, below the board. The card is laid out the same; kept for the callers.
   final bool end;
   final VoidCallback? onTap;
 
@@ -85,101 +87,105 @@ class PlayerPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final muted = theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
-    final text = Column(
-      crossAxisAlignment: end ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (isBot) ...[
-              Icon(Icons.smart_toy_outlined, size: 17, color: scheme.onSurfaceVariant),
-              const SizedBox(width: 4),
-            ],
-            Flexible(
-              child: Text(
-                name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium,
-              ),
-            ),
-            if (rank != null && rank!.isNotEmpty) ...[
-              const SizedBox(width: 6),
-              Text(
-                rank!,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ],
-        ),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (thinking) ...[
-              const SizedBox.square(
-                dimension: 12,
-                child: CircularProgressIndicator(strokeWidth: 1.6),
-              ),
-              const SizedBox(width: 6),
-            ],
-            Flexible(
-              child: Text(
-                [if (thinking) 'Thinking…', ?detail].join(' · '),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: muted,
-              ),
-            ),
-            if (note != null) ...[
-              const SizedBox(width: 8),
-              Text(
-                note!,
-                style: muted?.copyWith(color: scheme.primary, fontWeight: FontWeight.w700),
-              ),
-            ],
-          ],
-        ),
-      ],
-    );
-    final children = <Widget>[
-      StoneIcon(color, size: 34),
-      const SizedBox(width: 12),
-      Flexible(child: text),
-      if (clock != null) ...[const SizedBox(width: 16), clock!],
-    ];
+    final dark = scheme.brightness == Brightness.dark;
+    final fg = active ? scheme.onPrimary : scheme.onSurface;
+    final muted = active ? scheme.onPrimary.withValues(alpha: 0.68) : scheme.onSurfaceVariant;
+    final line = [if (thinking) 'Thinking…', ?detail].join(' · ');
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      // A row rather than an Align: the pill must keep its own height (the board takes the rest).
-      child: Row(
-        mainAxisAlignment: end ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: [
-          Flexible(
-            child: Material(
-              color: scheme.surfaceContainer,
-              shape: StadiumBorder(
-                side: active
-                    ? BorderSide(color: scheme.primary, width: 2)
-                    : const BorderSide(color: Colors.transparent, width: 2),
-              ),
-              child: InkWell(
-                customBorder: const StadiumBorder(),
-                onTap: onTap,
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(end ? 18 : 8, 8, end ? 8 : 18, 8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: end ? children.reversed.toList() : children,
-                  ),
-                ),
-              ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      child: Pressable(
+        scale: 0.98,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.fromLTRB(14, 10, 18, 10),
+          decoration: BoxDecoration(
+            color: active
+                ? scheme.primary
+                : scheme.surfaceContainerHigh.withValues(alpha: dark ? 0.7 : 0.9),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(
+              color: active
+                  ? Colors.transparent
+                  : (dark ? Colors.white : Colors.black).withValues(alpha: 0.06),
             ),
           ),
-        ],
+          child: DefaultTextStyle.merge(
+            style: TextStyle(color: fg),
+            child: Row(
+              children: [
+                StoneIcon(color, size: 30),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          if (isBot) ...[
+                            Icon(Icons.smart_toy_outlined, size: 17, color: muted),
+                            const SizedBox(width: 4),
+                          ],
+                          Flexible(
+                            child: Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium?.copyWith(color: fg),
+                            ),
+                          ),
+                          if (rank != null && rank!.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              rank!,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: muted,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (line.isNotEmpty || note != null)
+                        Row(
+                          children: [
+                            if (thinking) ...[
+                              SizedBox.square(
+                                dimension: 11,
+                                child: CircularProgressIndicator(strokeWidth: 1.6, color: muted),
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                            Flexible(
+                              child: Text(
+                                line,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(color: muted),
+                              ),
+                            ),
+                            if (note != null) ...[
+                              const SizedBox(width: 8),
+                              Text(
+                                note!,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: fg,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+                if (clock != null) ...[const SizedBox(width: 12), clock!],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -241,13 +247,15 @@ class _OgsClockDisplayState extends State<OgsClockDisplay> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final low = _running && reading.critical < const Duration(seconds: 10);
+    // The color of the card it is on (dark on the accent), dimmed while it is not running.
+    final base = DefaultTextStyle.of(context).style.color ?? scheme.onSurface;
     return Text(
       reading.label,
-      style: theme.textTheme.titleLarge?.copyWith(
-        fontSize: 20,
-        color: low ? scheme.error : (_running ? scheme.onSurface : scheme.onSurfaceVariant),
+      style: theme.textTheme.headlineMedium?.copyWith(
+        fontSize: 30,
+        height: 1.1,
+        color: low ? scheme.error : (_running ? base : base.withValues(alpha: 0.6)),
         fontFeatures: const [FontFeature.tabularFigures()],
-        fontWeight: FontWeight.w600,
       ),
     );
   }

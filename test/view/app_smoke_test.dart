@@ -100,34 +100,40 @@ void main() {
             }
           }
 
-          // The hub.
+          // Home.
           expect(find.text('Play now'), findsOneWidget);
           expect(find.byTooltip('alice'), findsOneWidget);
           answerGameLists();
           await tester.pump(const Duration(milliseconds: 300));
           expect(tester.takeException(), isNull, reason: 'home');
 
-          // Puzzles, Learn and Watch open in sheets over the home screen.
-          Future<void> openSheet(String card, String expected) async {
-            await tester.ensureVisible(find.text(card).first);
-            await tester.pumpAndSettle();
-            await tester.tap(find.text(card).first);
+          // The chips set the size of the next game.
+          await tester.tap(find.text('13×13'));
+          await tester.pumpAndSettle();
+          expect(find.textContaining('13×13 · Rapid'), findsOneWidget);
+          await tester.tap(find.text('9×9'));
+          await tester.pumpAndSettle();
+
+          // Puzzles, Learn and Watch are tabs of the floating bar.
+          Future<void> openTab(String tab, String expected) async {
+            await tester.tap(find.byTooltip(tab));
             await tester.pump(const Duration(milliseconds: 500));
             answerGameLists();
             await tester.pump(const Duration(milliseconds: 300));
-            expect(find.text(expected), findsWidgets, reason: card);
-            expect(tester.takeException(), isNull, reason: card);
-            // The board of the home screen stays in view above the sheet: tapping it closes it.
-            await tester.tapAt(Offset(size.width / 2, 10));
-            await tester.pumpAndSettle();
+            expect(find.text(expected), findsWidgets, reason: tab);
+            expect(tester.takeException(), isNull, reason: tab);
           }
 
-          await openSheet('Puzzles', 'TOP COLLECTIONS');
-          await openSheet('Learn', 'Learn to play Go');
-          await openSheet('Watch', 'Updated live');
+          await openTab('Puzzles', 'TOP COLLECTIONS');
+          await openTab('Learn', 'Learn to play Go');
+          await openTab('Watch', 'Updated live');
+          await openTab('Home', 'Play now');
+          // The other tabs fade out of sight.
+          expect(find.text('Updated live'), findsNothing);
 
-          // My games, full screen.
-          await tester.ensureVisible(find.text('My games'));
+          // My games, full screen, from the account sheet.
+          await tester.tap(find.byTooltip('alice'));
+          await tester.pumpAndSettle();
           await tester.tap(find.text('My games'));
           await tester.pumpAndSettle();
           expect(find.text('vs a-very-long-opponent-username-indeed'), findsOneWidget);
@@ -136,11 +142,12 @@ void main() {
           await tester.pumpAndSettle();
 
           // The new game sheet, its three tabs.
-          await tester.ensureVisible(find.byTooltip('New game'));
-          await tester.tap(find.byTooltip('New game'));
+          await tester.ensureVisible(find.text('New game'));
+          await tester.tap(find.text('New game'));
           await tester.pumpAndSettle();
           expect(find.text('HANDICAPS'), findsOneWidget);
           await tester.ensureVisible(find.text('Required'));
+          await tester.pumpAndSettle();
           await tester.tap(find.text('Required'));
           await tester.pump();
           expect(find.textContaining('Find opponent · 9×9'), findsOneWidget);
@@ -165,13 +172,12 @@ void main() {
           await tester.tap(find.byTooltip('Close'));
           await tester.pumpAndSettle();
 
-          // The header has no board chip; the board is in the account sheet.
-          expect(find.text('Kaya'), findsNothing);
-          await tester.ensureVisible(find.byTooltip('alice'));
-          await tester.pumpAndSettle();
+          // The board, from the account sheet.
           await tester.tap(find.byTooltip('alice'));
           await tester.pumpAndSettle();
           expect(find.text('Board and stones'), findsOneWidget);
+          await tester.ensureVisible(find.text('Kaya'));
+          await tester.pumpAndSettle();
           await tester.tap(find.text('Kaya'));
           await tester.pumpAndSettle();
           await tester.scrollUntilVisible(
@@ -186,9 +192,9 @@ void main() {
           await tester.pumpAndSettle();
 
           // The profile, from the account sheet.
-          await tester.ensureVisible(find.byTooltip('alice'));
-          await tester.pumpAndSettle();
           await tester.tap(find.byTooltip('alice'));
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(find.text('Your profile'));
           await tester.pumpAndSettle();
           await tester.tap(find.text('Your profile'));
           await tester.pumpAndSettle();

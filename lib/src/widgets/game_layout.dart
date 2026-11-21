@@ -58,6 +58,23 @@ class GameLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The board sits inset, with rounded corners and a soft shadow.
+    final board = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 30,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        child: ClipRRect(borderRadius: BorderRadius.circular(20), child: this.board),
+      ),
+    );
     final actionArea = SafeArea(
       top: false,
       child: SizedBox(

@@ -40,13 +40,15 @@ Widget layout() => MaterialApp(
 
 void main() {
   for (final textScale in [1.0, 1.3]) {
-    testWidgets('the board uses the full width of a phone, text ×$textScale', (tester) async {
+    testWidgets('the board uses the width of a phone, inset 8 on each side, text ×$textScale', (
+      tester,
+    ) async {
       tester.platformDispatcher.textScaleFactorTestValue = textScale;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       await tester.binding.setSurfaceSize(const Size(412, 860));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(layout());
-      expect(tester.getRect(find.byKey(const Key('board'))).width, 412);
+      expect(tester.getRect(find.byKey(const Key('board'))).width, 412 - 16);
       expect(find.text('Passed'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
@@ -75,11 +77,17 @@ void main() {
     expect((above - below).abs(), lessThanOrEqualTo(1));
   });
 
-  testWidgets('the opponent is on the left and you on the right', (tester) async {
+  testWidgets('both players are full-width cards, the opponent above and you below', (
+    tester,
+  ) async {
     await tester.binding.setSurfaceSize(const Size(412, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(layout());
-    expect(tester.getRect(find.text('Computer')).left, lessThan(150));
-    expect(tester.getRect(find.text('You')).right, greaterThan(250));
+    final top = tester.getRect(find.byType(PlayerPill).first);
+    final bottom = tester.getRect(find.byType(PlayerPill).last);
+    expect(top.width, 412);
+    expect(bottom.width, 412);
+    expect(tester.getRect(find.text('Computer')).top, lessThan(bottom.top));
+    expect(tester.getRect(find.text('You')).top, greaterThan(top.bottom));
   });
 }

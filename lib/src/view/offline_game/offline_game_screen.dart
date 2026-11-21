@@ -334,6 +334,8 @@ class _OfflineGameScreenState extends ConsumerState<OfflineGameScreen> {
     }
 
     return Scaffold(
+      // The warmer, lighter tone of the game screens.
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       appBar: TopBar(
         title: title,
         muted: true,

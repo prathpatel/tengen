@@ -10,7 +10,11 @@ import 'package:tengen/src/widgets/ui.dart';
 
 /// Puzzles from the OGS puzzle collections, in a sheet over the home screen.
 class PuzzlesSheet extends ConsumerWidget {
-  const PuzzlesSheet({super.key});
+  const PuzzlesSheet({this.page = false, super.key});
+
+  /// Shown as a tab of the app rather than in a sheet: clear of the status bar and of the
+  /// floating tab bar.
+  final bool page;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -19,7 +23,7 @@ class PuzzlesSheet extends ConsumerWidget {
     void open(int id) => pushFullScreen<void>(context, PuzzleScreen(puzzleId: id));
 
     return ListView(
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: tabPagePadding(context, page: page),
       children: [
         const SheetTitle('Puzzles'),
         if (last != null)
