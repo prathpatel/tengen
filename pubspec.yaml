@@ -2,7 +2,7 @@ name: tengen
 description: Tengen, an open source mobile app to play Go on online-go.com and offline.
 publish_to: "none"
 
-version: 0.9.0+28
+version: 0.9.1+29
 
 environment:
   sdk: ^3.14.0

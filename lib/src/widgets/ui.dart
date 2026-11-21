@@ -158,8 +158,8 @@ class TopBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-/// An action at the bottom of the game and puzzle screens: a card button with an icon and its
-/// label.
+/// An action of the toolbar at the bottom of the game and puzzle screens: an icon with its label
+/// below, in the accent color when highlighted (the hint shown, the move to make).
 class RoundAction extends StatelessWidget {
   const RoundAction({
     required this.icon,
@@ -172,8 +172,6 @@ class RoundAction extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback? onPressed;
-
-  /// In the accent color (the hint shown, the move to make).
   final bool highlighted;
 
   @override
@@ -181,9 +179,9 @@ class RoundAction extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final enabled = onPressed != null;
-    final fg = highlighted
-        ? scheme.onPrimary
-        : (enabled ? scheme.onSurface : scheme.onSurfaceVariant.withValues(alpha: 0.5));
+    final color = !enabled
+        ? scheme.onSurfaceVariant.withValues(alpha: 0.4)
+        : (highlighted ? scheme.primary : scheme.onSurface);
     return Semantics(
       button: true,
       enabled: enabled,
@@ -191,34 +189,28 @@ class RoundAction extends StatelessWidget {
       excludeSemantics: true,
       child: Tooltip(
         message: label,
-        child: Material(
-          color: highlighted ? scheme.primary : scheme.surfaceContainer,
-          borderRadius: BorderRadius.circular(12),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onPressed,
-            child: SizedBox(
-              height: 48,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, color: fg, size: 18),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.1),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontSize: 14.5,
-                        color: fg,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+        child: InkResponse(
+          onTap: onPressed,
+          radius: 36,
+          child: SizedBox(
+            height: 60,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 22, color: color),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.1),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: 12,
+                    color: color,
+                    fontWeight: highlighted ? FontWeight.w600 : FontWeight.w500,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -227,27 +219,23 @@ class RoundAction extends StatelessWidget {
   }
 }
 
-/// The actions of a game or a puzzle: a row of card buttons sharing the width.
+/// The toolbar at the bottom of a game or a puzzle: actions spread evenly on a solid bar.
 class RoundActionBar extends StatelessWidget {
   const RoundActionBar({required this.actions, super.key});
 
   final List<Widget> actions;
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-    top: false,
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-      child: Row(
-        children: [
-          for (final (i, a) in actions.indexed) ...[
-            if (i > 0) const SizedBox(width: 8),
-            Expanded(child: a),
-          ],
-        ],
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        border: Border(top: BorderSide(color: scheme.outlineVariant)),
       ),
-    ),
-  );
+      child: Row(children: [for (final a in actions) Expanded(child: a)]),
+    );
+  }
 }
 
 /// Kept for callers: the tab bar is a solid bar below the pages, nothing floats over them.

@@ -5,6 +5,7 @@ import 'package:tengen/src/model/go/board.dart';
 import 'package:tengen/src/model/go/coordinates.dart';
 import 'package:tengen/src/model/go/game.dart';
 import 'package:tengen/src/model/go/scoring.dart';
+import 'package:tengen/src/widgets/ui.dart';
 
 /// `Black to play`, or `Move 12 · White D4` / `Move 13 · Black passed`.
 String moveSummary(GoGame game) {
@@ -35,7 +36,7 @@ String scoreDetail(SideScore side) {
 
 /// The height kept for the actions at the bottom of a game, whatever they are (round actions
 /// while playing, two large buttons when counting): the board must not move between phases.
-const kGameActionsHeight = 76.0;
+const kGameActionsHeight = 64.0;
 
 /// Lays out a game screen below its top bar: what goes above the board (the opponent, or a
 /// prompt), the board, what goes below (you, the score, the move list), and the actions.
@@ -58,11 +59,16 @@ class GameLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actionArea = SafeArea(
-      top: false,
-      child: SizedBox(
-        height: kGameActionsHeight,
-        child: Center(child: actions),
+    // The toolbar fills its strip, down to the bottom of the screen.
+    final scheme = Theme.of(context).colorScheme;
+    final actionArea = ColoredBox(
+      color: actions is RoundActionBar ? scheme.surfaceContainerLow : Colors.transparent,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: kGameActionsHeight,
+          child: actions is RoundActionBar ? actions : Center(child: actions),
+        ),
       ),
     );
     return LayoutBuilder(
