@@ -14,6 +14,7 @@ Widget layout() => MaterialApp(
         detail: '3 captures · komi 6.5',
         active: false,
         note: 'Passed',
+        clock: Text('8:41'),
       ),
       below: const PlayerPill(
         color: StoneColor.black,
@@ -21,6 +22,7 @@ Widget layout() => MaterialApp(
         detail: 'Your move · 30 captures',
         active: true,
         end: true,
+        clock: Text('2:14 (5×30s)'),
       ),
       board: const AspectRatio(
         aspectRatio: 1,
@@ -88,5 +90,13 @@ void main() {
     expect(bottom.width, 412);
     expect(tester.getRect(find.text('Computer')).top, lessThan(bottom.top));
     expect(tester.getRect(find.text('You')).top, greaterThan(top.bottom));
+  });
+
+  testWidgets('players with clocks keep their own height: the board gets the rest', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(412, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(layout());
+    expect(tester.getRect(find.byType(PlayerPill).first).height, lessThan(90));
+    expect(tester.getRect(find.byKey(const Key('board'))).width, 412);
   });
 }

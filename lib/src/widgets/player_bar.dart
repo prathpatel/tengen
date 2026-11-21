@@ -166,13 +166,14 @@ class PlayerPill extends StatelessWidget {
               const SizedBox(width: 12),
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
+                // No alignment: an aligned box would take all the height it is offered, and the
+                // layout offers the player row the whole screen to measure it.
                 constraints: const BoxConstraints(minWidth: 84),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: active ? scheme.onSurface : scheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                alignment: Alignment.center,
                 child: DefaultTextStyle.merge(
                   style: TextStyle(color: active ? scheme.surface : scheme.onSurfaceVariant),
                   child: clock!,
@@ -246,6 +247,7 @@ class _OgsClockDisplayState extends State<OgsClockDisplay> {
     final base = DefaultTextStyle.of(context).style.color ?? scheme.onSurface;
     return Text(
       reading.label,
+      textAlign: TextAlign.center,
       style: theme.textTheme.titleLarge?.copyWith(
         fontSize: 21,
         height: 1.2,
