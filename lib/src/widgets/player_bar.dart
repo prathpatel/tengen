@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:tengen/src/model/go/board.dart';
 import 'package:tengen/src/model/ogs/clock.dart';
-import 'package:tengen/src/widgets/ui.dart';
 
 /// A small stone icon.
 class StoneIcon extends StatelessWidget {
@@ -42,9 +41,8 @@ class StoneIcon extends StatelessWidget {
   );
 }
 
-/// A player above or below the board: a full-width rounded card with the stone, the name and
-/// rank, a line of detail and the clock in large thin figures. The player to move is on the
-/// accent color, the other on soft glass.
+/// A player above or below the board: the stone, the name and rank, a line of detail, and the
+/// clock in a box on the right, filled when it runs.
 class PlayerPill extends StatelessWidget {
   const PlayerPill({
     required this.color,
@@ -79,7 +77,7 @@ class PlayerPill extends StatelessWidget {
   /// Shows that the computer is choosing its move.
   final bool thinking;
 
-  /// You, below the board. The card is laid out the same; kept for the callers.
+  /// You, below the board. The row is laid out the same; kept for the callers.
   final bool end;
   final VoidCallback? onTap;
 
@@ -87,104 +85,101 @@ class PlayerPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final dark = scheme.brightness == Brightness.dark;
-    final fg = active ? scheme.onPrimary : scheme.onSurface;
-    final muted = active ? scheme.onPrimary.withValues(alpha: 0.68) : scheme.onSurfaceVariant;
     final line = [if (thinking) 'Thinking…', ?detail].join(' · ');
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      child: Pressable(
-        scale: 0.98,
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.fromLTRB(14, 10, 18, 10),
-          decoration: BoxDecoration(
-            color: active
-                ? scheme.primary
-                : scheme.surfaceContainerHigh.withValues(alpha: dark ? 0.7 : 0.9),
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(
-              color: active
-                  ? Colors.transparent
-                  : (dark ? Colors.white : Colors.black).withValues(alpha: 0.06),
-            ),
-          ),
-          child: DefaultTextStyle.merge(
-            style: TextStyle(color: fg),
-            child: Row(
-              children: [
-                StoneIcon(color, size: 30),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        child: Row(
+          children: [
+            StoneIcon(color, size: 26),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          if (isBot) ...[
-                            Icon(Icons.smart_toy_outlined, size: 17, color: muted),
-                            const SizedBox(width: 4),
-                          ],
-                          Flexible(
-                            child: Text(
-                              name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium?.copyWith(color: fg),
-                            ),
-                          ),
-                          if (rank != null && rank!.isNotEmpty) ...[
-                            const SizedBox(width: 6),
-                            Text(
-                              rank!,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: muted,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      if (line.isNotEmpty || note != null)
-                        Row(
-                          children: [
-                            if (thinking) ...[
-                              SizedBox.square(
-                                dimension: 11,
-                                child: CircularProgressIndicator(strokeWidth: 1.6, color: muted),
-                              ),
-                              const SizedBox(width: 6),
-                            ],
-                            Flexible(
-                              child: Text(
-                                line,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodyMedium?.copyWith(color: muted),
-                              ),
-                            ),
-                            if (note != null) ...[
-                              const SizedBox(width: 8),
-                              Text(
-                                note!,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: fg,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ],
+                      if (isBot) ...[
+                        Icon(Icons.smart_toy_outlined, size: 16, color: scheme.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                      ],
+                      Flexible(
+                        child: Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                         ),
+                      ),
+                      if (rank != null && rank!.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          rank!,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
-                ),
-                if (clock != null) ...[const SizedBox(width: 12), clock!],
-              ],
+                  if (line.isNotEmpty || note != null)
+                    Row(
+                      children: [
+                        if (thinking) ...[
+                          const SizedBox.square(
+                            dimension: 11,
+                            child: CircularProgressIndicator(strokeWidth: 1.6),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        Flexible(
+                          child: Text(
+                            line,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 13,
+                              color: active ? scheme.primary : scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                        if (note != null) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            note!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 13,
+                              color: scheme.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                ],
+              ),
             ),
-          ),
+            if (clock != null) ...[
+              const SizedBox(width: 12),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                constraints: const BoxConstraints(minWidth: 84),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: active ? scheme.onSurface : scheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: DefaultTextStyle.merge(
+                  style: TextStyle(color: active ? scheme.surface : scheme.onSurfaceVariant),
+                  child: clock!,
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -247,14 +242,14 @@ class _OgsClockDisplayState extends State<OgsClockDisplay> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final low = _running && reading.critical < const Duration(seconds: 10);
-    // The color of the card it is on (dark on the accent), dimmed while it is not running.
+    // The color of the box it is in (dark on the light box of the running clock).
     final base = DefaultTextStyle.of(context).style.color ?? scheme.onSurface;
     return Text(
       reading.label,
-      style: theme.textTheme.headlineMedium?.copyWith(
-        fontSize: 30,
-        height: 1.1,
-        color: low ? scheme.error : (_running ? base : base.withValues(alpha: 0.6)),
+      style: theme.textTheme.titleLarge?.copyWith(
+        fontSize: 21,
+        height: 1.2,
+        color: low ? scheme.error : base,
         fontFeatures: const [FontFeature.tabularFigures()],
       ),
     );

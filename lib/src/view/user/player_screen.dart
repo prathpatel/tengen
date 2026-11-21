@@ -88,7 +88,7 @@ class PlayerScreen extends ConsumerWidget {
             ),
           },
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            padding: const EdgeInsets.fromLTRB(16, 20, 20, 0),
             child: Row(
               children: [
                 Expanded(
@@ -122,7 +122,7 @@ class PlayerScreen extends ConsumerWidget {
           if (games case AsyncData(:final value))
             for (final g in value.take(15)) _RecentGame(game: g, playerId: playerId),
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+            padding: const EdgeInsets.fromLTRB(16, 12, 24, 0),
             child: Text(
               'Counts of finished games on online-go.com, annulled ones left out.',
               style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
@@ -434,7 +434,7 @@ class _ChallengeSheetState extends ConsumerState<_ChallengeSheet> {
                       ),
                     ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                    padding: const EdgeInsets.fromLTRB(16, 10, 20, 0),
                     child: Text(
                       quickMatchTime(_size, _speed, system),
                       style: theme.textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
@@ -471,7 +471,7 @@ class _ChallengeSheetState extends ConsumerState<_ChallengeSheet> {
             SafeArea(
               top: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
+                padding: const EdgeInsets.fromLTRB(16, 8, 20, 14),
                 child: waiting
                     ? OutlinedButton.icon(
                         onPressed: ref.read(botChallengeProvider.notifier).cancel,

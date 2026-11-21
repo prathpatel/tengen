@@ -208,8 +208,6 @@ class _HubTopicScreenState extends ConsumerState<HubTopicScreen> {
 
     final pages = topic.pages.length;
     return Scaffold(
-      // The warmer, lighter tone of the game screens.
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       // A keyboard opened by a sheet over the game (the chat) must not squeeze the board.
       resizeToAvoidBottomInset: false,
       body: SafeArea(

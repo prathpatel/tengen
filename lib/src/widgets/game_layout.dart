@@ -5,7 +5,6 @@ import 'package:tengen/src/model/go/board.dart';
 import 'package:tengen/src/model/go/coordinates.dart';
 import 'package:tengen/src/model/go/game.dart';
 import 'package:tengen/src/model/go/scoring.dart';
-import 'package:tengen/src/widgets/ui.dart';
 
 /// `Black to play`, or `Move 12 · White D4` / `Move 13 · Black passed`.
 String moveSummary(GoGame game) {
@@ -36,7 +35,7 @@ String scoreDetail(SideScore side) {
 
 /// The height kept for the actions at the bottom of a game, whatever they are (round actions
 /// while playing, two large buttons when counting): the board must not move between phases.
-const kGameActionsHeight = 112.0;
+const kGameActionsHeight = 76.0;
 
 /// Lays out a game screen below its top bar: what goes above the board (the opponent, or a
 /// prompt), the board, what goes below (you, the score, the move list), and the actions.
@@ -59,31 +58,6 @@ class GameLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The players and the actions slide softly into place when the screen opens.
-    final above = Entrance(offset: -16, child: this.above);
-    final below = Entrance(delay: const Duration(milliseconds: 80), child: this.below);
-    final actions = Entrance(
-      delay: const Duration(milliseconds: 160),
-      offset: 40,
-      child: this.actions,
-    );
-    // The board sits inset, with rounded corners and a soft shadow.
-    final board = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.35),
-              blurRadius: 30,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
-        child: ClipRRect(borderRadius: BorderRadius.circular(20), child: this.board),
-      ),
-    );
     final actionArea = SafeArea(
       top: false,
       child: SizedBox(

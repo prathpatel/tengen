@@ -1,9 +1,7 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:material_ui/material_ui.dart';
 
-/// The building blocks of the Tengen design: round icon buttons, labelled round actions, small
-/// uppercase section labels, cards, toggles, steppers and sheets.
+/// The building blocks of the Tengen design: icon buttons, the top bar, action buttons, section
+/// labels, cards, grouped lists, option tiles, toggles, steppers and sheets.
 
 /// A secondary button: the size of the main one, on the card color instead of the accent.
 ButtonStyle softButtonStyle(BuildContext context) {
@@ -14,7 +12,7 @@ ButtonStyle softButtonStyle(BuildContext context) {
   );
 }
 
-/// A round icon button on a card colored disc, for the top of screens (back, chat, menu).
+/// A plain round icon button, for the top of screens (back, chat, menu).
 class CircleIconButton extends StatelessWidget {
   const CircleIconButton({
     required this.icon,
@@ -35,13 +33,12 @@ class CircleIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final count = badge;
     final iconWidget = Icon(icon, size: size * 0.46);
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: scheme.surfaceContainer,
+        color: Colors.transparent,
         shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),
@@ -100,62 +97,60 @@ class TopBar extends StatelessWidget implements PreferredSizeWidget {
   final bool muted;
 
   @override
-  Size get preferredSize => const Size.fromHeight(64);
+  Size get preferredSize => const Size.fromHeight(57);
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final canPop = Navigator.of(context).canPop();
+    final lead = leading ?? (canPop ? const CircleBackButton() : null);
     return SafeArea(
       bottom: false,
-      child: SizedBox(
-        height: 64,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: Row(
-            children: [
-              SizedBox(width: 44, child: leading ?? (canPop ? const CircleBackButton() : null)),
-              Expanded(
-                child:
-                    titleWidget ??
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (title != null)
-                          Text(
-                            title!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: muted
-                                ? theme.textTheme.bodyLarge?.copyWith(
-                                    color: scheme.onSurfaceVariant,
-                                    fontWeight: FontWeight.w500,
-                                  )
-                                : theme.textTheme.titleMedium?.copyWith(fontSize: 18),
-                          ),
-                        if (subtitle != null)
-                          Text(
-                            subtitle!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+        ),
+        child: SizedBox(
+          height: 56,
+          child: Padding(
+            padding: EdgeInsets.only(left: lead == null ? 16 : 6, right: 6),
+            child: Row(
+              children: [
+                ?lead,
+                if (lead != null) const SizedBox(width: 4),
+                Expanded(
+                  child:
+                      titleWidget ??
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (title != null)
+                            Text(
+                              title!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontSize: 17,
+                                color: muted ? scheme.onSurfaceVariant : scheme.onSurface,
+                              ),
                             ),
-                          ),
-                      ],
-                    ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (final (i, a) in actions.indexed) ...[if (i > 0) const SizedBox(width: 8), a],
-                  if (actions.isEmpty) const SizedBox(width: 44),
-                ],
-              ),
-            ],
+                          if (subtitle != null)
+                            Text(
+                              subtitle!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                        ],
+                      ),
+                ),
+                ...actions,
+              ],
+            ),
           ),
         ),
       ),
@@ -163,7 +158,8 @@ class TopBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-/// A round action with its label below, for the bottom of the game and puzzle screens.
+/// An action at the bottom of the game and puzzle screens: a card button with an icon and its
+/// label.
 class RoundAction extends StatelessWidget {
   const RoundAction({
     required this.icon,
@@ -174,8 +170,6 @@ class RoundAction extends StatelessWidget {
   });
 
   final IconData icon;
-
-  /// Said by the tooltip and to screen readers; the button itself shows only the icon.
   final String label;
   final VoidCallback? onPressed;
 
@@ -184,11 +178,12 @@ class RoundAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final enabled = onPressed != null;
     final fg = highlighted
         ? scheme.onPrimary
-        : (enabled ? scheme.onSurface : scheme.onSurfaceVariant.withValues(alpha: 0.4));
+        : (enabled ? scheme.onSurface : scheme.onSurfaceVariant.withValues(alpha: 0.5));
     return Semantics(
       button: true,
       enabled: enabled,
@@ -196,18 +191,35 @@ class RoundAction extends StatelessWidget {
       excludeSemantics: true,
       child: Tooltip(
         message: label,
-        child: Pressable(
-          onTap: onPressed,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            width: 56,
-            height: 52,
-            decoration: BoxDecoration(
-              color: highlighted ? scheme.primary : Colors.transparent,
-              borderRadius: BorderRadius.circular(26),
+        child: Material(
+          color: highlighted ? scheme.primary : scheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onPressed,
+            child: SizedBox(
+              height: 48,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: fg, size: 18),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.1),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 14.5,
+                        color: fg,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            child: Icon(icon, color: fg, size: 24),
           ),
         ),
       ),
@@ -215,7 +227,7 @@ class RoundAction extends StatelessWidget {
   }
 }
 
-/// The actions of a game or a puzzle: icons in a floating glass pill.
+/// The actions of a game or a puzzle: a row of card buttons sharing the width.
 class RoundActionBar extends StatelessWidget {
   const RoundActionBar({required this.actions, super.key});
 
@@ -225,100 +237,60 @@ class RoundActionBar extends StatelessWidget {
   Widget build(BuildContext context) => SafeArea(
     top: false,
     child: Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-      child: GlassPanel(
-        radius: 32,
-        padding: const EdgeInsets.all(6),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final (i, a) in actions.indexed) ...[
-              if (i > 0) const SizedBox(width: 6),
-              Flexible(child: a),
-            ],
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+      child: Row(
+        children: [
+          for (final (i, a) in actions.indexed) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Expanded(child: a),
           ],
-        ),
+        ],
       ),
     ),
   );
 }
 
-/// The height of the floating tab bar with its margin, kept clear at the bottom of tab pages.
-const kFloatingBarClearance = 88.0;
+/// Kept for callers: the tab bar is a solid bar below the pages, nothing floats over them.
+const kFloatingBarClearance = 0.0;
 
-/// The padding of a list that is either a tab page (below the status bar, above the floating
-/// tab bar) or the content of a sheet.
+/// The padding of a list that is either a tab page (below the status bar) or the content of a
+/// sheet.
 EdgeInsets tabPagePadding(BuildContext context, {required bool page}) {
   if (!page) return const EdgeInsets.only(bottom: 24);
-  final insets = MediaQuery.paddingOf(context);
-  return EdgeInsets.only(top: insets.top + 16, bottom: insets.bottom + kFloatingBarClearance + 8);
+  return EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 8, bottom: 24);
 }
 
-/// Frosted glass: what is behind shows through, blurred, under a tint of the surface.
+/// A flat card (once frosted glass; the plain design has none). The tint and opacity are kept
+/// for callers.
 class GlassPanel extends StatelessWidget {
   const GlassPanel({
     required this.child,
-    this.radius = 24,
+    this.radius = 14,
     this.padding = EdgeInsets.zero,
     this.tint,
-    this.opacity = 0.72,
-    this.shadow = true,
-    this.blur = true,
+    this.opacity = 1,
+    this.shadow = false,
+    this.blur = false,
     super.key,
   });
 
   final Widget child;
   final double radius;
   final EdgeInsetsGeometry padding;
-
-  /// The tint, the high surface by default.
   final Color? tint;
   final double opacity;
-
-  /// A soft drop shadow under the panel; off for small pieces side by side (chips), whose
-  /// shadows would merge into a dark band.
   final bool shadow;
-
-  /// Blurs what is behind. Off for panels in scrolling content: a backdrop blur that scrolls
-  /// can flicker (drawn clear for a frame, then frosted) on some phones.
   final bool blur;
 
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final dark = scheme.brightness == Brightness.dark;
-    final shape = BorderRadius.circular(radius);
-    final panel = Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: (tint ?? scheme.surfaceContainerHigh).withValues(alpha: opacity),
-        borderRadius: shape,
-        border: Border.all(
-          color: (dark ? Colors.white : Colors.black).withValues(alpha: dark ? 0.07 : 0.05),
-        ),
-      ),
-      child: child,
-    );
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: shape,
-        boxShadow: [
-          if (shadow)
-            BoxShadow(
-              color: Colors.black.withValues(alpha: dark ? 0.3 : 0.1),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
-            ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: shape,
-        child: blur
-            ? BackdropFilter(filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18), child: panel)
-            : panel,
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+    padding: padding,
+    decoration: BoxDecoration(
+      color: tint ?? Theme.of(context).colorScheme.surfaceContainer,
+      borderRadius: BorderRadius.circular(radius),
+    ),
+    child: child,
+  );
 }
 
 /// Shrinks a little while pressed and springs back: the soft touch of the design's buttons and
@@ -361,7 +333,7 @@ class _PressableState extends State<Pressable> {
 class SectionLabel extends StatelessWidget {
   const SectionLabel(
     this.text, {
-    this.padding = const EdgeInsets.fromLTRB(20, 20, 20, 10),
+    this.padding = const EdgeInsets.fromLTRB(16, 20, 16, 8),
     this.trailing,
     super.key,
   });
@@ -382,8 +354,6 @@ class SectionLabel extends StatelessWidget {
               text.toUpperCase(),
               style: theme.textTheme.labelMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 1,
               ),
             ),
           ),
@@ -403,10 +373,10 @@ class SoftCard extends StatelessWidget {
   const SoftCard({
     required this.child,
     this.onTap,
-    this.padding = const EdgeInsets.all(18),
+    this.padding = const EdgeInsets.all(16),
     this.selected = false,
     this.color,
-    this.radius = 20,
+    this.radius = 14,
     super.key,
   });
 
@@ -461,15 +431,15 @@ class NavCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: scheme.primary, size: 26),
-          const SizedBox(height: 14),
+          Icon(icon, color: scheme.primary, size: 22),
+          const SizedBox(height: 12),
           Text(
             title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleMedium?.copyWith(fontSize: 18),
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             subtitle,
             maxLines: 1,
@@ -645,15 +615,10 @@ class SheetTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(24, 0, 20, 8),
+    padding: const EdgeInsets.fromLTRB(16, 4, 12, 8),
     child: Row(
       children: [
-        Expanded(
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 30),
-          ),
-        ),
+        Expanded(child: Text(title, style: Theme.of(context).textTheme.headlineMedium)),
         ?trailing,
         if (close) const CircleBackButton(icon: Icons.close_rounded),
       ],
@@ -768,8 +733,8 @@ class Entrance extends StatefulWidget {
   const Entrance({
     required this.child,
     this.delay = Duration.zero,
-    this.offset = 24,
-    this.duration = const Duration(milliseconds: 520),
+    this.offset = 12,
+    this.duration = const Duration(milliseconds: 320),
     super.key,
   });
 
@@ -842,5 +807,239 @@ class CountUp extends StatelessWidget {
         : const Duration(milliseconds: 1100),
     curve: Curves.easeOutCubic,
     builder: (context, v, _) => builder(context, v.round()),
+  );
+}
+
+/// A grouped list: rows on one card, separated by thin lines.
+class Group extends StatelessWidget {
+  const Group({required this.children, this.margin, super.key});
+
+  final List<Widget> children;
+  final EdgeInsetsGeometry? margin;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: margin ?? const EdgeInsets.symmetric(horizontal: 16),
+      child: Material(
+        color: scheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final (i, c) in children.indexed) ...[
+              if (i > 0) Divider(height: 1, thickness: 1, color: scheme.outlineVariant),
+              c,
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A row of a [Group]: something on the left, a title and a subtitle, something on the right.
+class GroupRow extends StatelessWidget {
+  const GroupRow({
+    required this.title,
+    this.subtitle,
+    this.leading,
+    this.trailing,
+    this.onTap,
+    this.chevron = true,
+    super.key,
+  });
+
+  final String title;
+  final String? subtitle;
+  final Widget? leading;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  /// A chevron on the right when the row opens something and has no [trailing].
+  final bool chevron;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            if (leading != null) ...[leading!, const SizedBox(width: 14)],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 1),
+                    Text(
+                      subtitle!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (trailing != null) ...[const SizedBox(width: 10), trailing!],
+            if (trailing == null && chevron && onTap != null) ...[
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right_rounded, size: 20, color: scheme.onSurfaceVariant),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A radio mark: an empty ring, or a ring with a dot in the accent color when selected.
+class RadioMark extends StatelessWidget {
+  const RadioMark({required this.selected, super.key});
+
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: selected ? scheme.primary : scheme.outlineVariant, width: 2),
+      ),
+      alignment: Alignment.center,
+      child: AnimatedScale(
+        scale: selected ? 1 : 0,
+        duration: const Duration(milliseconds: 180),
+        child: Container(
+          width: 11,
+          height: 11,
+          decoration: BoxDecoration(color: scheme.primary, shape: BoxShape.circle),
+        ),
+      ),
+    );
+  }
+}
+
+/// An option of [ChoiceTiles].
+@immutable
+class TileOption<T> {
+  const TileOption(this.value, this.label, {this.detail});
+
+  final T value;
+  final String label;
+
+  /// A second line (`30s`, `10m`).
+  final String? detail;
+}
+
+/// Options as tiles side by side, the selected one filled with the accent (board size, time).
+class ChoiceTiles<T> extends StatelessWidget {
+  const ChoiceTiles({
+    required this.options,
+    required this.selected,
+    required this.onChanged,
+    super.key,
+  });
+
+  final List<TileOption<T>> options;
+  final T selected;
+  final ValueChanged<T>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final twoLines = options.any((o) => o.detail != null);
+    return Row(
+      children: [
+        for (final (i, o) in options.indexed) ...[
+          if (i > 0) const SizedBox(width: 8),
+          Expanded(
+            child: Semantics(
+              button: true,
+              selected: o.value == selected,
+              child: Material(
+                color: o.value == selected ? scheme.primary : scheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(10),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: onChanged == null ? null : () => onChanged!(o.value),
+                  child: SizedBox(
+                    height: twoLines ? 58 : 44,
+                    child: Center(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              o.label,
+                              maxLines: 1,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontSize: 15,
+                                color: o.value == selected ? scheme.onPrimary : scheme.onSurface,
+                              ),
+                            ),
+                            if (o.detail != null)
+                              Text(
+                                o.detail!,
+                                maxLines: 1,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: (o.value == selected ? scheme.onPrimary : scheme.onSurface)
+                                      .withValues(alpha: 0.7),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// The title of a tab page (`Tengen`, `Learn`) with actions on the right.
+class PageHeader extends StatelessWidget {
+  const PageHeader(this.title, {this.actions = const [], super.key});
+
+  final String title;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 4, 10, 8),
+    child: SizedBox(
+      height: 44,
+      child: Row(
+        children: [
+          Expanded(child: Text(title, style: Theme.of(context).textTheme.headlineMedium)),
+          ...actions,
+        ],
+      ),
+    ),
   );
 }

@@ -44,9 +44,12 @@ class PlayScreen extends StatelessWidget {
           children: [
             SheetTitle('New game', close: true),
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              // Three tabs share the width: none may scroll out of sight on a narrow phone.
               child: TabBar(
-                isScrollable: true,
+                tabAlignment: TabAlignment.fill,
+                indicatorSize: TabBarIndicatorSize.tab,
+                labelPadding: EdgeInsets.zero,
                 tabs: [
                   Tab(text: 'Online'),
                   Tab(text: 'Computer'),

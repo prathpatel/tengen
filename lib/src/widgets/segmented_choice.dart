@@ -42,11 +42,11 @@ class SegmentedChoice<T> extends StatelessWidget {
     return Opacity(
       opacity: enabled ? 1 : 0.5,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 52),
-        padding: const EdgeInsets.all(5),
+        constraints: const BoxConstraints(minHeight: 40),
+        padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           color: scheme.surfaceContainer,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: IntrinsicHeight(
           child: Stack(
@@ -62,15 +62,8 @@ class SegmentedChoice<T> extends StatelessWidget {
                       heightFactor: 1,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: scheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.18),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
+                          color: scheme.surfaceContainerHigh,
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                     ),
@@ -86,19 +79,19 @@ class SegmentedChoice<T> extends StatelessWidget {
                         button: true,
                         child: Material(
                           type: MaterialType.transparency,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(8),
                           clipBehavior: Clip.antiAlias,
                           child: InkWell(
                             onTap: enabled ? () => onChanged!(choice.value) : null,
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                               child: Center(
                                 child: FittedBox(
                                   fit: BoxFit.scaleDown,
                                   child: AnimatedDefaultTextStyle(
                                     duration: duration,
                                     style: theme.textTheme.titleMedium!.copyWith(
-                                      fontSize: 17,
+                                      fontSize: 14.5,
                                       color: choice.value == selected
                                           ? scheme.onSurface
                                           : scheme.onSurfaceVariant,

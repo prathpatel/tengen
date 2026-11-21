@@ -66,7 +66,7 @@ class _WatchSheetState extends ConsumerState<WatchSheet> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
+            padding: const EdgeInsets.fromLTRB(16, 4, 20, 14),
             child: SegmentedChoice<GameListKind>(
               choices: const [
                 Choice(GameListKind.live, 'Top live'),
@@ -115,7 +115,7 @@ class _WatchSheetState extends ConsumerState<WatchSheet> {
           },
           if ((games.value?.length ?? 0) > _shown)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+              padding: const EdgeInsets.fromLTRB(16, 14, 20, 0),
               child: OutlinedButton(
                 onPressed: () => pushFullScreen<void>(context, GameListScreen(kind: _kind)),
                 child: Text('All ${games.value!.length} games'),
@@ -123,7 +123,7 @@ class _WatchSheetState extends ConsumerState<WatchSheet> {
             ),
           SectionLabel(
             'Chat rooms',
-            padding: const EdgeInsets.fromLTRB(24, 26, 12, 6),
+            padding: const EdgeInsets.fromLTRB(16, 26, 12, 6),
             trailing: TextButton(
               onPressed: () => pushFullScreen<void>(context, const ChatRoomsScreen()),
               child: const Text('All rooms'),

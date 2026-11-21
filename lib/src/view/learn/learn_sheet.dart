@@ -28,10 +28,11 @@ class LearnSheet extends ConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
+    Widget accentIcon(IconData i) => Icon(i, size: 22, color: scheme.primary);
     return ListView(
       padding: tabPagePadding(context, page: page),
       children: [
-        const SheetTitle('Learn to play Go'),
+        if (page) const PageHeader('Learn') else const SheetTitle('Learn'),
         switch (hub) {
           AsyncData(:final value) => Builder(
             builder: (context) {
@@ -45,179 +46,127 @@ class LearnSheet extends ConsumerWidget {
               final current = value.sections
                   .where((s) => s.topics.any((t) => pagesDone(done, t) < t.pages.length))
                   .firstOrNull;
+              final share = topics.isEmpty ? 0.0 : topicsDone / topics.length;
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Container(
-                      padding: const EdgeInsets.all(18),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: scheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: scheme.primary.withValues(alpha: 0.5)),
+                        color: scheme.surfaceContainer,
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _Ring(
-                            value: topics.isEmpty ? 0 : topicsDone / topics.length,
-                            size: 88,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text('$topicsDone', style: theme.textTheme.titleLarge),
-                                Text(
-                                  'of ${topics.length}',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: scheme.onSurfaceVariant,
-                                  ),
+                          Row(
+                            children: [
+                              _Ring(
+                                value: share,
+                                size: 58,
+                                child: Text(
+                                  '${(share * 100).round()}%',
+                                  style: theme.textTheme.titleSmall?.copyWith(fontSize: 14),
                                 ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 18),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  next == null
-                                      ? 'COURSE COMPLETED'
-                                      : 'UP NEXT · ${nextSection!.title.toUpperCase()}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.labelMedium?.copyWith(
-                                    color: scheme.primary,
-                                    letterSpacing: 1,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  next?.title ?? 'Well done!',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.titleLarge,
-                                ),
-                                if (next != null) ...[
-                                  const SizedBox(height: 10),
-                                  FilledButton(
-                                    style: FilledButton.styleFrom(
-                                      minimumSize: const Size(0, 46),
-                                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                                    ),
-                                    onPressed: () => pushFullScreen<void>(
-                                      context,
-                                      HubTopicScreen(
-                                        topicId: next.id,
-                                        initialPage: firstUndone(done, next),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      next == null ? 'Course completed' : 'Up next',
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        color: scheme.primary,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Flexible(
-                                          child: Text(
-                                            topicsDone == 0 ? 'Start' : 'Continue',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        const Icon(Icons.chevron_right_rounded, size: 22),
-                                      ],
+                                    Text(
+                                      next?.title ?? 'Well done!',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ],
-                            ),
+                                    if (next != null)
+                                      Text(
+                                        '${nextSection!.title} · page '
+                                        '${firstUndone(done, next) + 1} of ${next.pages.length}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                          color: scheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
+                          if (next != null) ...[
+                            const SizedBox(height: 14),
+                            FilledButton(
+                              style: FilledButton.styleFrom(minimumSize: const Size(0, 46)),
+                              onPressed: () => pushFullScreen<void>(
+                                context,
+                                HubTopicScreen(
+                                  topicId: next.id,
+                                  initialPage: firstUndone(done, next),
+                                ),
+                              ),
+                              child: Text(topicsDone == 0 ? 'Start' : 'Continue'),
+                            ),
+                          ],
                         ],
                       ),
                     ),
                   ),
-                  const SectionLabel('Sections', padding: EdgeInsets.fromLTRB(24, 24, 24, 8)),
-                  for (final section in value.sections)
-                    Builder(
-                      builder: (context) {
-                        final total = section.topics.length;
-                        final complete = section.topics
-                            .where((t) => pagesDone(done, t) == t.pages.length)
-                            .length;
-                        final finished = complete == total;
-                        final active = section == current;
-                        return InkWell(
-                          onTap: () => pushFullScreen<void>(
-                            context,
-                            HubSectionScreen(sectionIndex: section.index),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(24, 10, 24, 10),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: finished
-                                        ? scheme.primary
-                                        : (active
-                                              ? scheme.primaryContainer
-                                              : scheme.surfaceContainer),
-                                  ),
-                                  child: finished
-                                      ? Icon(Icons.check_rounded, color: scheme.onPrimary)
-                                      : Text(
-                                          '${section.index + 1}',
-                                          style: theme.textTheme.titleMedium?.copyWith(
-                                            color: active
-                                                ? scheme.primary
-                                                : scheme.onSurfaceVariant,
-                                          ),
+                  const SectionLabel('Course'),
+                  Group(
+                    children: [
+                      for (final section in value.sections)
+                        Builder(
+                          builder: (context) {
+                            final total = section.topics.length;
+                            final complete = section.topics
+                                .where((t) => pagesDone(done, t) == t.pages.length)
+                                .length;
+                            final finished = complete == total;
+                            final active = section == current;
+                            return GroupRow(
+                              leading: Container(
+                                width: 30,
+                                height: 30,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: finished ? scheme.primary : null,
+                                  border: finished
+                                      ? null
+                                      : Border.all(
+                                          color: active ? scheme.primary : scheme.outlineVariant,
+                                          width: 2,
                                         ),
                                 ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(section.title, style: theme.textTheme.titleMedium),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: ClipRRect(
-                                              borderRadius: BorderRadius.circular(3),
-                                              child: LinearProgressIndicator(
-                                                value: total == 0 ? 0 : complete / total,
-                                                minHeight: 5,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 14),
-                                          SizedBox(
-                                            width: 56,
-                                            child: Text(
-                                              '$complete / $total',
-                                              textAlign: TextAlign.right,
-                                              style: theme.textTheme.bodySmall?.copyWith(
-                                                color: scheme.onSurfaceVariant,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                                child: finished
+                                    ? Icon(Icons.check_rounded, size: 18, color: scheme.onPrimary)
+                                    : null,
+                              ),
+                              title: section.title,
+                              subtitle: '$complete of $total',
+                              onTap: () => pushFullScreen<void>(
+                                context,
+                                HubSectionScreen(sectionIndex: section.index),
+                              ),
+                            );
+                          },
+                        ),
+                    ],
+                  ),
                 ],
               );
             },
@@ -228,37 +177,28 @@ class LearnSheet extends ConsumerWidget {
             child: Center(child: CircularProgressIndicator()),
           ),
         },
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-          child: Row(
-            children: [
-              Expanded(
-                child: _SmallCard(
-                  icon: Icons.my_location_rounded,
-                  title: 'Coordinates',
-                  subtitle: best.isEmpty
-                      ? 'Find D4, Q16…'
-                      : 'Best: ${best.values.reduce(math.max)}',
-                  onTap: () => pushFullScreen<void>(context, const CoordinateTrainingScreen()),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: _SmallCard(
-                  icon: Icons.smart_toy_outlined,
-                  title: 'Practice',
-                  subtitle: '9×9 vs bot',
-                  onTap: () => pushFullScreen<void>(
-                    context,
-                    const OfflineGameScreen(setup: OfflineGameSetup()),
-                  ),
-                ),
-              ),
-            ],
-          ),
+        const SectionLabel('Practice'),
+        Group(
+          children: [
+            GroupRow(
+              leading: accentIcon(Icons.my_location_rounded),
+              title: 'Coordinates',
+              subtitle: best.isEmpty
+                  ? 'Find D4, Q16… against the clock'
+                  : 'Best ${best.values.reduce(math.max)} in 30 s',
+              onTap: () => pushFullScreen<void>(context, const CoordinateTrainingScreen()),
+            ),
+            GroupRow(
+              leading: accentIcon(Icons.smart_toy_outlined),
+              title: 'Play a beginner bot',
+              subtitle: '9×9, on this phone',
+              onTap: () =>
+                  pushFullScreen<void>(context, const OfflineGameScreen(setup: OfflineGameSetup())),
+            ),
+          ],
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+          padding: const EdgeInsets.fromLTRB(16, 20, 24, 0),
           child: Text(
             'Course from the online-go.com Learning Hub, © the OGS contributors, GNU AGPL v3.',
             textAlign: TextAlign.center,
@@ -276,50 +216,6 @@ int firstUndone(Set<String> done, HubTopic topic) {
     if (!done.contains(HubProgressController.key(topic, i))) return i;
   }
   return 0;
-}
-
-class _SmallCard extends StatelessWidget {
-  const _SmallCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return SoftCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        children: [
-          Icon(icon, color: scheme.primary, size: 26),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: theme.textTheme.titleMedium),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _Ring extends StatelessWidget {
@@ -341,9 +237,9 @@ class _Ring extends StatelessWidget {
             dimension: size,
             child: CircularProgressIndicator(
               value: value == 0 ? 0.02 : value,
-              strokeWidth: 6,
+              strokeWidth: 5,
               strokeCap: StrokeCap.round,
-              backgroundColor: scheme.surfaceContainerHighest,
+              backgroundColor: scheme.outlineVariant,
             ),
           ),
           child,

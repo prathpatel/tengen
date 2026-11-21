@@ -11,7 +11,6 @@ class TengenApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(preferencesProvider.select((p) => p.themeMode));
-    // The app's colors follow the board, as in the lichess app.
     final board = ref.watch(preferencesProvider.select((p) => p.boardTheme));
     return MaterialApp(
       title: kAppName,
@@ -23,6 +22,12 @@ class TengenApp extends ConsumerWidget {
         AppThemeMode.light => ThemeMode.light,
         AppThemeMode.dark => ThemeMode.dark,
       },
+      // Very large system font sizes would break the layout of the design; they are kept up to
+      // a point.
+      builder: (context, child) => MediaQuery.withClampedTextScaling(
+        maxScaleFactor: 1.2,
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: const AppShell(),
     );
   }

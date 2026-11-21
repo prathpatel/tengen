@@ -25,65 +25,37 @@ class PuzzlesSheet extends ConsumerWidget {
     return ListView(
       padding: tabPagePadding(context, page: page),
       children: [
-        const SheetTitle('Puzzles'),
+        if (page) const PageHeader('Puzzles') else const SheetTitle('Puzzles'),
         if (last != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
             child: _ContinueCard(id: last.id, title: last.title, onTap: () => open(last.id)),
           ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: NavCard(
-                      icon: Icons.school_outlined,
-                      title: 'Beginners',
-                      subtitle: 'Basics with solutions',
-                      onTap: () => open(2625),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: NavCard(
-                      icon: Icons.favorite_border_rounded,
-                      title: 'Life and death',
-                      subtitle: 'Cho Chikun',
-                      onTap: () => open(2824),
-                    ),
-                  ),
-                ],
+        const SectionLabel('Start here'),
+        Group(
+          children: [
+            for (final (icon, title, subtitle, onTap) in [
+              (Icons.school_outlined, 'Beginners', 'Basics with solutions', () => open(2625)),
+              (Icons.favorite_border_rounded, 'Life and death', 'Cho Chikun', () => open(2824)),
+              (Icons.bolt_rounded, 'Tesuji', 'Find the clever move', () => open(26872)),
+              (
+                Icons.search_rounded,
+                'All collections',
+                'By the OGS community',
+                () => pushFullScreen<void>(context, const PuzzleCollectionsScreen()),
               ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: NavCard(
-                      icon: Icons.bolt_rounded,
-                      title: 'Tesuji',
-                      subtitle: 'Find the clever move',
-                      onTap: () => open(26872),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: NavCard(
-                      icon: Icons.search_rounded,
-                      title: 'All collections',
-                      subtitle: 'By the OGS community',
-                      onTap: () => pushFullScreen<void>(context, const PuzzleCollectionsScreen()),
-                    ),
-                  ),
-                ],
+            ])
+              GroupRow(
+                leading: Icon(icon, size: 22, color: Theme.of(context).colorScheme.primary),
+                title: title,
+                subtitle: subtitle,
+                onTap: onTap,
               ),
-            ],
-          ),
+          ],
         ),
         SectionLabel(
           'Top collections',
-          padding: const EdgeInsets.fromLTRB(24, 24, 12, 4),
+          padding: const EdgeInsets.fromLTRB(16, 24, 12, 4),
           trailing: TextButton(
             onPressed: () => pushFullScreen<void>(context, const PuzzleCollectionsScreen()),
             child: const Text('See all'),
@@ -209,7 +181,7 @@ class CollectionTile extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           children: [
             if (preview != null)
