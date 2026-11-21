@@ -22,6 +22,7 @@ import 'package:tengen/src/view/play/automatch_screen.dart';
 import 'package:tengen/src/view/play/play_screen.dart';
 import 'package:tengen/src/view/puzzle/puzzle_screen.dart';
 import 'package:tengen/src/view/settings/settings_screen.dart';
+import 'package:tengen/src/view/shell_tab.dart';
 import 'package:tengen/src/view/user/player_screen.dart';
 import 'package:tengen/src/widgets/goban.dart';
 import 'package:tengen/src/widgets/ui.dart';
@@ -446,16 +447,25 @@ class _Tiles extends ConsumerWidget {
 
     final topics = hub?.topics.toList() ?? const <HubTopic>[];
     final topicsDone = topics.where((t) => pagesDone(done, t) == t.pages.length).length;
+    void open(ShellTab tab) => ref.read(shellTabProvider.notifier).select(tab);
     final tiles = [
       _Tile(
         label: 'Puzzles',
         value: lastPuzzle == null ? 'Start' : 'Resume',
         onTap: lastPuzzle == null
-            ? null
+            ? () => open(ShellTab.puzzles)
             : () => pushFullScreen<void>(context, PuzzleScreen(puzzleId: lastPuzzle.id)),
       ),
-      _Tile(label: 'Learn', value: hub == null ? '…' : '$topicsDone/${topics.length}'),
-      _Tile(label: 'Watch', value: live == null ? '…' : '${live.length} live'),
+      _Tile(
+        label: 'Learn',
+        value: hub == null ? '…' : '$topicsDone/${topics.length}',
+        onTap: () => open(ShellTab.learn),
+      ),
+      _Tile(
+        label: 'Watch',
+        value: live == null ? '…' : '${live.length} live',
+        onTap: () => open(ShellTab.watch),
+      ),
     ];
     return Row(
       children: [

@@ -7,6 +7,7 @@ import 'package:tengen/src/view/learn/learn_sheet.dart';
 import 'package:tengen/src/view/online_game/online_game_screen.dart';
 import 'package:tengen/src/view/play/automatch_screen.dart';
 import 'package:tengen/src/view/puzzle/puzzles_sheet.dart';
+import 'package:tengen/src/view/shell_tab.dart';
 import 'package:tengen/src/view/watch/watch_sheet.dart';
 import 'package:tengen/src/widgets/ui.dart';
 
@@ -20,40 +21,40 @@ class AppShell extends ConsumerStatefulWidget {
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-enum _Tab {
-  home('Home', Icons.home_outlined, Icons.home_rounded),
-  puzzles('Puzzles', Icons.extension_outlined, Icons.extension_rounded),
-  learn('Learn', Icons.school_outlined, Icons.school_rounded),
-  watch('Watch', Icons.live_tv_outlined, Icons.live_tv_rounded);
+extension on ShellTab {
+  String get label => switch (this) {
+    ShellTab.home => 'Home',
+    ShellTab.puzzles => 'Puzzles',
+    ShellTab.learn => 'Learn',
+    ShellTab.watch => 'Watch',
+  };
 
-  const _Tab(this.label, this.icon, this.selectedIcon);
-
-  final String label;
-  final IconData icon;
-  final IconData selectedIcon;
+  (IconData, IconData) get icons => switch (this) {
+    ShellTab.home => (Icons.home_outlined, Icons.home_rounded),
+    ShellTab.puzzles => (Icons.extension_outlined, Icons.extension_rounded),
+    ShellTab.learn => (Icons.school_outlined, Icons.school_rounded),
+    ShellTab.watch => (Icons.live_tv_outlined, Icons.live_tv_rounded),
+  };
 }
 
 class _AppShellState extends ConsumerState<AppShell> {
-  _Tab _tab = _Tab.home;
-
   /// The tabs opened so far; they keep their state (scroll, choices) once built.
-  final _opened = <_Tab>{_Tab.home};
+  final _opened = <ShellTab>{ShellTab.home};
 
-  void _select(_Tab tab) => setState(() {
-    _tab = tab;
-    _opened.add(tab);
-  });
+  void _select(ShellTab tab) => ref.read(shellTabProvider.notifier).select(tab);
 
-  Widget _page(_Tab tab) => switch (tab) {
-    _Tab.home => const HomeScreen(),
-    _Tab.puzzles => const PuzzlesSheet(page: true),
-    _Tab.learn => const LearnSheet(page: true),
-    _Tab.watch => const WatchSheet(page: true),
+  Widget _page(ShellTab tab) => switch (tab) {
+    ShellTab.home => const HomeScreen(),
+    ShellTab.puzzles => const PuzzlesSheet(page: true),
+    ShellTab.learn => const LearnSheet(page: true),
+    ShellTab.watch => const WatchSheet(page: true),
   };
 
   @override
   Widget build(BuildContext context) {
     final automatch = ref.watch(automatchProvider);
+    final tab = ref.watch(shellTabProvider);
+    _opened.add(tab);
 
     ref.listen(automatchProvider, (_, next) {
       if (next is AutomatchFound) {
@@ -67,16 +68,16 @@ class _AppShellState extends ConsumerState<AppShell> {
 
     return PopScope(
       // Back from another tab goes home first.
-      canPop: _tab == _Tab.home,
+      canPop: tab == ShellTab.home,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _select(_Tab.home);
+        if (!didPop) _select(ShellTab.home);
       },
       child: Scaffold(
         body: Stack(
           children: [
-            for (final tab in _Tab.values)
-              if (_opened.contains(tab))
-                _FadingPage(key: ValueKey(tab), active: tab == _tab, child: _page(tab)),
+            for (final t in ShellTab.values)
+              if (_opened.contains(t))
+                _FadingPage(key: ValueKey(t), active: t == tab, child: _page(t)),
             Positioned(
               left: 0,
               right: 0,
@@ -98,7 +99,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                             ? _SearchingBar(automatch.settings)
                             : const SizedBox(width: double.infinity),
                       ),
-                      _TabBar(selected: _tab, onSelect: _select),
+                      _TabBar(selected: tab, onSelect: _select),
                     ],
                   ),
                 ),
@@ -160,8 +161,8 @@ class _FadingPageState extends State<_FadingPage> {
 class _TabBar extends ConsumerWidget {
   const _TabBar({required this.selected, required this.onSelect});
 
-  final _Tab selected;
-  final ValueChanged<_Tab> onSelect;
+  final ShellTab selected;
+  final ValueChanged<ShellTab> onSelect;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -173,7 +174,7 @@ class _TabBar extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          for (final tab in _Tab.values) ...[
+          for (final tab in ShellTab.values) ...[
             Semantics(
               button: true,
               selected: tab == selected,
@@ -195,7 +196,7 @@ class _TabBar extends ConsumerWidget {
                           : Colors.transparent,
                     ),
                     child: Icon(
-                      tab == selected ? tab.selectedIcon : tab.icon,
+                      tab == selected ? tab.icons.$2 : tab.icons.$1,
                       size: 24,
                       color: tab == selected ? scheme.onSurface : scheme.onSurfaceVariant,
                     ),

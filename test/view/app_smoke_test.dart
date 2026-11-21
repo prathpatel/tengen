@@ -128,6 +128,13 @@ void main() {
           await openTab('Learn', 'Learn to play Go');
           await openTab('Watch', 'Updated live');
           await openTab('Home', 'Play now');
+          // The home tiles open their tabs too.
+          await tester.ensureVisible(find.text('Watch'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Watch'), warnIfMissed: false);
+          await tester.pumpAndSettle();
+          expect(find.text('Updated live'), findsWidgets);
+          await openTab('Home', 'Play now');
           // The other tabs fade out of sight.
           expect(find.text('Updated live'), findsNothing);
 
